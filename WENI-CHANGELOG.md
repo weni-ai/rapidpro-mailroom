@@ -1,6 +1,6 @@
 1.4.22-mailroom-10.2.0
 ----------
- * Update outboxThreshold to 30000
+ * Update outboxThreshold to 50000
 
 1.4.21-mailroom-10.2.0
 ----------
