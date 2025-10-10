@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	throttleOutboxThreshold = 10_000
+	throttleOutboxThreshold = 50_000
 )
 
 func init() {
