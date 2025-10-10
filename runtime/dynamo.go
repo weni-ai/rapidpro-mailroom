@@ -27,7 +27,7 @@ type DynamoTables struct {
 }
 
 func NewDynamoClient(cfg *Config) (*dynamodb.Client, error) {
-	return dynamo.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSRegion, cfg.DynamoEndpoint)
+	return dynamo.NewClient(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.DynamoRegion, cfg.DynamoEndpoint)
 }
 
 func NewDynamoTables(cfg *Config) (*DynamoTables, error) {
