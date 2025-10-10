@@ -1,6 +1,14 @@
-1.4.21-mailroom-10.0.0
+1.4.22-mailroom-10.2.0
 ----------
  * Update outboxThreshold to 30000
+
+1.4.21-mailroom-10.2.0
+----------
+ * Fix Dynamo region
+
+1.4.20-mailroom-10.2.0
+----------
+ * update mailroom to 10.2.0
 
 1.4.20-mailroom-10.0.0
 ----------
