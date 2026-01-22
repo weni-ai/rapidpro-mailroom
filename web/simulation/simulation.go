@@ -28,8 +28,8 @@ const (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/sim/start", web.RequireAuthToken(web.JSONPayload(handleStart)))
-	web.RegisterRoute(http.MethodPost, "/mr/sim/resume", web.RequireAuthToken(web.JSONPayload(handleResume)))
+	web.InternalRoute(http.MethodPost, "/sim/start", web.JSONPayload(handleStart))
+	web.InternalRoute(http.MethodPost, "/sim/resume", web.JSONPayload(handleResume))
 }
 
 type flowDefinition struct {
@@ -47,8 +47,8 @@ type sessionRequest struct {
 	Call    *flows.CallEnvelope    `json:"call,omitempty"`
 }
 
-func (r *sessionRequest) flows() map[assets.FlowUUID]json.RawMessage {
-	flows := make(map[assets.FlowUUID]json.RawMessage, len(r.Flows))
+func (r *sessionRequest) flows() map[assets.FlowUUID][]byte {
+	flows := make(map[assets.FlowUUID][]byte, len(r.Flows))
 	for _, fd := range r.Flows {
 		flows[fd.UUID] = fd.Definition
 	}
@@ -133,7 +133,7 @@ func handleSimulationEvents(ctx context.Context, db models.DBorTx, oa *models.Or
 func handleStart(ctx context.Context, rt *runtime.Runtime, r *startRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, http.StatusBadRequest, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	// create clone of assets for simulation
@@ -199,7 +199,7 @@ type resumeRequest struct {
 func handleResume(ctx context.Context, rt *runtime.Runtime, r *resumeRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return nil, http.StatusBadRequest, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	// create clone of assets for simulation
@@ -259,10 +259,10 @@ func handleResume(ctx context.Context, rt *runtime.Runtime, r *resumeRequest) (a
 					var sessionTrigger flows.Trigger
 					var call *flows.Call
 					if triggeredFlow.FlowType() == models.FlowTypeVoice {
-						sessionTrigger = tb.Msg(msgEvt).Build()
+						sessionTrigger = tb.MsgReceived(msgEvt).Build()
 						call = flows.NewCall(testCallUUID, oa.SessionAssets().Channels().Get(testChannelUUID), testURN)
 					} else {
-						mtb := tb.Msg(msgEvt)
+						mtb := tb.MsgReceived(msgEvt)
 						if keyword != "" {
 							mtb = mtb.WithMatch(&triggers.KeywordMatch{Type: trigger.KeywordMatchType(), Keyword: keyword})
 						}

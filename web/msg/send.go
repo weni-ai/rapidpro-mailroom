@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/msgio"
+	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/msg/send", web.RequireAuthToken(web.JSONPayload(handleSend)))
+	web.InternalRoute(http.MethodPost, "/msg/send", web.JSONPayload(handleSend))
 }
 
 // Request to send a message.
@@ -34,7 +34,7 @@ type sendRequest struct {
 	Text         string             `json:"text"`
 	Attachments  []utils.Attachment `json:"attachments"`
 	QuickReplies []flows.QuickReply `json:"quick_replies"`
-	TicketID     models.TicketID    `json:"ticket_id"`
+	TicketUUID   flows.TicketUUID   `json:"ticket_uuid"`
 }
 
 // handles a request to resend the given messages
@@ -42,10 +42,10 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *sendRequest) (any, 
 	// grab our org
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	// load the contact and generate as a flow contact
+	// load the contact and convert to engine contact
 	c, err := models.LoadContact(ctx, rt.DB, oa, r.ContactID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error loading contact: %w", err)
@@ -57,38 +57,38 @@ func handleSend(ctx context.Context, rt *runtime.Runtime, r *sendRequest) (any, 
 	}
 
 	content := &flows.MsgContent{Text: r.Text, Attachments: r.Attachments, QuickReplies: r.QuickReplies}
-
-	out, ch := models.CreateMsgOut(rt, oa, contact, content, models.NilTemplateID, nil, contact.Locale(oa.Env()), nil)
-	event := events.NewMsgCreated(out)
-
-	msg, err := models.NewOutgoingChatMsg(rt, oa.Org(), ch, contact, event, r.TicketID, r.UserID)
+	out, err := models.CreateMsgOut(rt, oa, contact, content, models.NilTemplateID, nil, contact.Locale(oa.Env()), nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error creating outgoing message: %w", err)
+		return nil, 0, fmt.Errorf("error creating message content: %w", err)
 	}
 
-	if err := models.InsertMessages(ctx, rt.DB, []*models.Msg{msg.Msg}); err != nil {
-		return nil, 0, fmt.Errorf("error inserting outgoing message: %w", err)
+	event := events.NewMsgCreated(out, "", r.TicketUUID)
+
+	scene := runner.NewScene(c, contact)
+
+	if err := scene.AddEvent(ctx, rt, oa, event, r.UserID); err != nil {
+		return nil, 0, fmt.Errorf("error adding message event to scene: %w", err)
+	}
+	if err := scene.Commit(ctx, rt, oa); err != nil {
+		return nil, 0, fmt.Errorf("error committing scene: %w", err)
 	}
 
+	msg := scene.OutgoingMsgs[0]
+
+	// TODO move this into event handler?
 	// if message was a ticket reply, update the ticket
-	if r.TicketID != models.NilTicketID {
-		if err := models.RecordTicketReply(ctx, rt.DB, oa, r.TicketID, r.UserID, time.Now()); err != nil {
+	if r.TicketUUID != "" {
+		if err := models.RecordTicketReply(ctx, rt.DB, oa, r.TicketUUID, r.UserID, dates.Now()); err != nil {
 			return nil, 0, fmt.Errorf("error recording ticket reply: %w", err)
 		}
 	}
 
-	msgio.QueueMessages(ctx, rt, []*models.MsgOut{msg})
-
 	return map[string]any{
-		"id":            msg.ID(),
-		"channel":       out.Channel(),
-		"contact":       contact.Reference(),
-		"urn":           out.URN(),
-		"text":          msg.Text(),
-		"attachments":   msg.Attachments(),
-		"quick_replies": msg.QuickReplies(),
-		"status":        msg.Status(),
-		"created_on":    msg.CreatedOn(),
-		"modified_on":   msg.ModifiedOn(),
+		"event":       event,
+		"contact":     contact.Reference(),
+		"status":      msg.Status(),
+		"created_on":  msg.CreatedOn(),
+		"modified_on": msg.ModifiedOn(),
+		"id":          msg.ID(), // deprecated, but still used by API
 	}, http.StatusOK, nil
 }

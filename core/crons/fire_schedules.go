@@ -35,9 +35,6 @@ func (c *FireSchedulesCron) Run(ctx context.Context, rt *runtime.Runtime) (map[s
 
 	log := slog.With("comp", "schedules_cron")
 
-	rc := rt.VK.Get()
-	defer rc.Close()
-
 	// get any expired schedules
 	unfired, err := models.GetUnfiredSchedules(ctx, rt.DB.DB)
 	if err != nil {
@@ -91,8 +88,7 @@ func (c *FireSchedulesCron) Run(ctx context.Context, rt *runtime.Runtime) (map[s
 			start := s.Trigger.CreateStart()
 
 			// insert our flow start
-			err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start})
-			if err != nil {
+			if err := models.InsertFlowStart(ctx, tx, start); err != nil {
 				log.Error("error inserting new flow start for schedule", "error", err)
 				tx.Rollback()
 				continue
@@ -127,14 +123,14 @@ func (c *FireSchedulesCron) Run(ctx context.Context, rt *runtime.Runtime) (map[s
 		// commit our transaction
 		err = tx.Commit()
 		if err != nil {
-			log.Error("error comitting schedule transaction", "error", err)
+			log.Error("error committing schedule transaction", "error", err)
 			tx.Rollback()
 			continue
 		}
 
 		// add our task if we have one
 		if task != nil {
-			err = tasks.Queue(rc, tasks.BatchQueue, s.OrgID, task, true)
+			err = tasks.Queue(ctx, rt, rt.Queues.Batch, s.OrgID, task, true)
 			if err != nil {
 				log.Error(fmt.Sprintf("error queueing %s task from schedule", task.Type()), "error", err)
 			}

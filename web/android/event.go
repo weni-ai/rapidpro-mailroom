@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks/handler"
-	"github.com/nyaruka/mailroom/core/tasks/handler/ctasks"
+	"github.com/nyaruka/mailroom/core/tasks/realtime"
+	"github.com/nyaruka/mailroom/core/tasks/realtime/ctasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/nyaruka/null/v3"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/android/event", web.RequireAuthToken(web.JSONPayload(handleEvent)))
+	web.InternalRoute(http.MethodPost, "/android/event", web.JSONPayload(handleEvent))
 }
 
 // Creates a new channel event from an Android relayer sync.
@@ -40,7 +40,7 @@ type eventRequest struct {
 func handleEvent(ctx context.Context, rt *runtime.Runtime, r *eventRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	cu, err := resolveContact(ctx, rt, oa, r.ChannelID, r.Phone)
@@ -62,11 +62,8 @@ func handleEvent(ctx context.Context, rt *runtime.Runtime, r *eventRequest) (any
 	}
 
 	if needsHandling {
-		rc := rt.VK.Get()
-		defer rc.Close()
-
-		err = handler.QueueTask(rc, r.OrgID, e.ContactID, &ctasks.EventReceivedTask{
-			EventID:    e.ID,
+		err = realtime.QueueTask(ctx, rt, r.OrgID, e.ContactID, &ctasks.EventReceivedTask{
+			EventUUID:  e.UUID,
 			EventType:  e.EventType,
 			ChannelID:  e.ChannelID,
 			URNID:      e.URNID,

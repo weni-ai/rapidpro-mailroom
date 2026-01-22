@@ -18,7 +18,7 @@ import (
 const (
 	TypeStartFlow = "start_flow"
 
-	startBatchSize = 100
+	startBatchSize = 25
 )
 
 func init() {
@@ -109,23 +109,20 @@ func createFlowStartBatches(ctx context.Context, rt *runtime.Runtime, oa *models
 	}
 
 	// batches will be processed in the throttled queue unless we're a single contact
-	q := tasks.ThrottledQueue
+	q := rt.Queues.Throttled
 	if len(contactIDs) == 1 {
-		q = tasks.HandlerQueue
+		q = rt.Queues.Realtime
 	}
 
 	// split the contact ids into batches to become batch tasks
 	idBatches := slices.Collect(slices.Chunk(contactIDs, startBatchSize))
-
-	rc := rt.VK.Get()
-	defer rc.Close()
 
 	for i, idBatch := range idBatches {
 		isFirst := (i == 0)
 		isLast := (i == len(idBatches)-1)
 		batchTask := &StartFlowBatchTask{FlowStartBatch: start.CreateBatch(idBatch, isFirst, isLast, len(contactIDs))}
 
-		if err := tasks.Queue(rc, q, start.OrgID, batchTask, false); err != nil {
+		if err := tasks.Queue(ctx, rt, q, start.OrgID, batchTask, false); err != nil {
 			if i == 0 {
 				return fmt.Errorf("error queuing flow start batch: %w", err)
 			}

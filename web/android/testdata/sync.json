@@ -2,7 +2,7 @@
     {
         "label": "illegal method",
         "method": "GET",
-        "path": "/mr/android/sync",
+        "path": "/mi/android/sync",
         "status": 405,
         "response": {
             "error": "illegal method: GET"
@@ -11,7 +11,7 @@
     {
         "label": "invalid channel_id",
         "method": "POST",
-        "path": "/mr/android/sync",
+        "path": "/mi/android/sync",
         "body": {
             "channel_id": 5000
         },
@@ -23,9 +23,9 @@
     {
         "label": "valid channel sync",
         "method": "POST",
-        "path": "/mr/android/sync",
+        "path": "/mi/android/sync",
         "body": {
-            "channel_id": $channel_id_1$
+            "channel_id": 30000
         },
         "status": 500,
         "response": {

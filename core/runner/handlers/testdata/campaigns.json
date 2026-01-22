@@ -1,0 +1,401 @@
+[
+    {
+        "label": "#1",
+        "msgs": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": {
+                "urn": "tel:+16055741111",
+                "channel": {
+                    "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+                    "name": "Twilio"
+                },
+                "text": "Hi there"
+            }
+        },
+        "events": {},
+        "actions": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "type": "remove_contact_groups",
+                    "uuid": "12e14d18-62ed-4024-8dae-8012d8e2336f",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                },
+                {
+                    "type": "add_contact_groups",
+                    "uuid": "904d5d70-8405-479b-8916-29275bd1c327",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                },
+                {
+                    "type": "set_contact_field",
+                    "uuid": "da2b7872-21e1-477c-bfc3-601367bef8bf",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": "2029-09-15T12:00:00+00:00"
+                },
+                {
+                    "type": "set_contact_field",
+                    "uuid": "ce506737-1ccd-4756-aa13-997da4a3cc31",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": ""
+                }
+            ],
+            "b699a406-7e44-49be-9f01-1a82893e8a10": [
+                {
+                    "type": "add_contact_groups",
+                    "uuid": "8641a385-5368-4bcf-989d-2131df5d5877",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                },
+                {
+                    "type": "set_contact_field",
+                    "uuid": "b4237335-a759-434e-932f-e39912acb94b",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": "2029-09-15T12:00:00+00:00"
+                },
+                {
+                    "type": "set_contact_field",
+                    "uuid": "82894663-9e8c-4a35-845c-2113d76a2ab3",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": "2029-09-15T12:00:00+00:00"
+                }
+            ],
+            "cd024bcd-f473-4719-a00a-bd0bb1190135": [
+                {
+                    "type": "add_contact_groups",
+                    "uuid": "f0daa040-4b3d-4315-96da-d3b7a2996aa8",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                },
+                {
+                    "type": "set_contact_field",
+                    "uuid": "63dc6d2f-cc89-4530-b3ca-c473960e9fb2",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "value": "2029-09-15T12:00:00+00:00"
+                },
+                {
+                    "type": "remove_contact_groups",
+                    "uuid": "3ca3c699-cae7-4148-bafc-d5951296a72a",
+                    "groups": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT scope FROM contacts_contactfire WHERE contact_id = 10000 AND fire_type = 'C'",
+                "set": [
+                    "30000:1"
+                ]
+            },
+            {
+                "query": "SELECT scope FROM contacts_contactfire WHERE contact_id = 10001 AND fire_type = 'C'",
+                "set": [
+                    "10000:1",
+                    "10001:1",
+                    "10002:1",
+                    "30000:1"
+                ]
+            },
+            {
+                "query": "SELECT scope FROM contacts_contactfire WHERE contact_id = 10002 AND fire_type = 'C'",
+                "set": []
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-8283-76f8-a8fd-1537ca860f97",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:18.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-7e9b-76f8-9566-6fb2598c32d6",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-960b-76f8-92ca-6e1d7f550554",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:23Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:23.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-9ddb-76f8-9803-f4a851d20f2b",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:25Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:25.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "datetime": "2029-09-15T12:00:00.000000Z",
+                        "text": "2029-09-15T12:00:00+00:00"
+                    }
+                }
+            },
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-a993-76f8-8b56-5e92bbfe0e3f",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:28.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-7e9b-76f8-9566-6fb2598c32d6",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-ccbb-76f8-acdc-e181352d44cc",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:37.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-c8d3-76f8-9491-58ccdc93a8a8",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-e043-76f8-8ceb-17799a976525",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:42Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:42.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-e813-76f8-9504-776e7d151101",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:44Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:44.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "datetime": "2029-09-15T12:00:00.000000Z",
+                        "text": "2029-09-15T12:00:00+00:00"
+                    }
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-efe3-76f8-998e-ae5bd773804a",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:46Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:46.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-fb9b-76f8-87bc-209e78511534",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:49.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-c8d3-76f8-9491-58ccdc93a8a8",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:46.123456789Z",
+                    "msg": {
+                        "channel": {
+                            "name": "Twilio",
+                            "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+                        },
+                        "text": "Hi there",
+                        "urn": "tel:+16055741111"
+                    },
+                    "type": "msg_received"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-24c3-76f8-ba82-c15b24dd577f",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:54.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-20db-76f8-97a3-ae27459a6be4",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-3c33-76f8-a13f-9238de2a0b76",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:00Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:00.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-4403-76f8-9014-2c868db4022e",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:02Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:02.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-4bd3-76f8-bef6-3979f99a96f9",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:04Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:04.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "datetime": "2029-09-15T12:00:00.000000Z",
+                        "text": "2029-09-15T12:00:00+00:00"
+                    }
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-53a3-76f8-ba91-c48ad8c50e6b",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:06Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:06.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": null
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-5f5b-76f8-be24-6164105d48f2",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:09.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-20db-76f8-97a3-ae27459a6be4",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            }
+        ]
+    }
+]

@@ -3,9 +3,12 @@ package models_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nyaruka/gocommon/aws/dynamo"
+	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
 	"github.com/nyaruka/gocommon/httpx"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdb"
@@ -15,9 +18,9 @@ import (
 )
 
 func TestChannelLogsOutgoing(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetDynamo)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo)
 
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
@@ -49,22 +52,26 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	clog2.Error(&clogs.Error{Message: "oops"})
 	clog2.End()
 
-	err = models.InsertChannelLogs(ctx, rt, []*models.ChannelLog{clog1, clog2})
+	_, err = rt.Writers.Main.Queue(clog1)
+	require.NoError(t, err)
+	_, err = rt.Writers.Main.Queue(clog2)
 	require.NoError(t, err)
 
-	count, err := rt.Dynamo.Main.Count(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 2, count)
+	rt.Writers.Main.Flush()
+
+	dyntest.AssertCount(t, rt.Dynamo, "TestMain", 2)
 
 	// read log back from DynamoDB
-	item, err := rt.Dynamo.Main.GetItem(ctx, clog1.DynamoKey())
+	item, err := dynamo.GetItem(ctx, rt.Dynamo, "TestMain", clog1.DynamoKey())
 	require.NoError(t, err)
-	assert.Equal(t, string(models.ChannelLogTypeIVRStart), item.Data["type"])
+	if assert.NotNil(t, item) {
+		assert.Equal(t, string(models.ChannelLogTypeIVRStart), item.Data["type"])
+		assert.Equal(t, clog1.CreatedOn.Truncate(time.Second).Add(time.Hour*24*7), *item.TTL)
 
-	var dataGZ map[string]any
-	err = dynamo.UnmarshalJSONGZ(item.DataGZ, &dataGZ)
-	require.NoError(t, err)
-	assert.Len(t, dataGZ["http_logs"], 1)
+		data, err := item.GetData()
+		require.NoError(t, err)
+		assert.Len(t, data["http_logs"], 1)
 
-	assert.NotContains(t, string(item.DataGZ), "sesame", "redacted value should not be present in DynamoDB log")
+		assert.NotContains(t, string(jsonx.MustMarshal(data)), "sesame", "redacted value should not be present in DynamoDB log")
+	}
 }

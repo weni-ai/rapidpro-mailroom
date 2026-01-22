@@ -1,0 +1,60 @@
+[
+    {
+        "label": "#1",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b47-2c93-76f8-9654-8a7258fbaae4",
+                    "type": "broadcast_created",
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "translations": {
+                        "eng": {
+                            "text": "hello world"
+                        }
+                    },
+                    "base_language": "eng",
+                    "urns": [
+                        "tel:+12065551212"
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from flows_flowrun where contact_id = $1 AND status = 'C'",
+                "args": [
+                    10000
+                ],
+                "returns": 0
+            }
+        ],
+        "expected_tasks": {
+            "batch/1": [
+                {
+                    "type": "send_broadcast",
+                    "payload": {
+                        "broadcast_uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                        "org_id": 1,
+                        "status": "P",
+                        "translations": {
+                            "eng": {
+                                "text": "hello world"
+                            }
+                        },
+                        "base_language": "eng",
+                        "expressions": false,
+                        "urns": [
+                            "tel:+12065551212"
+                        ],
+                        "exclusions": {
+                            "non_active": false,
+                            "in_a_flow": false,
+                            "started_previously": false,
+                            "not_seen_since_days": 0
+                        }
+                    }
+                }
+            ]
+        }
+    }
+]

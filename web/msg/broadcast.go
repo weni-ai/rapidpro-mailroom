@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/msg/broadcast", web.RequireAuthToken(web.JSONPayload(handleBroadcast)))
+	web.InternalRoute(http.MethodPost, "/msg/broadcast", web.JSONPayload(handleBroadcast))
 }
 
 // Request to send a broadcast.
@@ -63,7 +63,7 @@ type broadcastRequest struct {
 func handleBroadcast(ctx context.Context, rt *runtime.Runtime, r *broadcastRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	if len(r.ContactIDs) == 0 && len(r.GroupIDs) == 0 && len(r.URNs) == 0 && r.Query == "" && r.NodeUUID == "" {
@@ -76,6 +76,7 @@ func handleBroadcast(ctx context.Context, rt *runtime.Runtime, r *broadcastReque
 	}
 
 	bcast := &models.Broadcast{
+		UUID:              flows.NewBroadcastUUID(),
 		OrgID:             r.OrgID,
 		Status:            models.BroadcastStatusPending,
 		Translations:      r.Translations,
@@ -118,10 +119,7 @@ func handleBroadcast(ctx context.Context, rt *runtime.Runtime, r *broadcastReque
 	if r.Schedule == nil {
 		task := &msgs.SendBroadcastTask{Broadcast: bcast}
 
-		rc := rt.VK.Get()
-		defer rc.Close()
-
-		if err := tasks.Queue(rc, tasks.BatchQueue, bcast.OrgID, task, true); err != nil {
+		if err := tasks.Queue(ctx, rt, rt.Queues.Batch, bcast.OrgID, task, true); err != nil {
 			return nil, 0, fmt.Errorf("error queuing send broadcast task: %w", err)
 		}
 	}

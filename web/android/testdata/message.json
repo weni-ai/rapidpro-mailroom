@@ -2,7 +2,7 @@
     {
         "label": "illegal method",
         "method": "GET",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "status": 405,
         "response": {
             "error": "illegal method: GET"
@@ -11,7 +11,7 @@
     {
         "label": "invalid org_id",
         "method": "POST",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "body": {
             "org_id": 1234,
             "channel_id": 12,
@@ -21,13 +21,13 @@
         },
         "status": 500,
         "response": {
-            "error": "unable to load org assets: error loading environment for org 1234: no org with id: 1234"
+            "error": "error loading org assets: error loading environment for org 1234: no org with id: 1234"
         }
     },
     {
         "label": "message from existing contact created in database",
         "method": "POST",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -38,19 +38,29 @@
         "status": 200,
         "response": {
             "duplicate": false,
-            "id": 1
+            "id": 30000
         },
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM msgs_msg WHERE direction = 'I' and contact_id = 10000 AND text = 'Hello'",
-                "count": 1
+                "returns": 1
             }
-        ]
+        ],
+        "expected_tasks": {
+            "realtime/1": [
+                {
+                    "type": "handle_contact_event",
+                    "payload": {
+                        "contact_id": 10000
+                    }
+                }
+            ]
+        }
     },
     {
         "label": "message from new contact created in database",
         "method": "POST",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -61,19 +71,29 @@
         "status": 200,
         "response": {
             "duplicate": false,
-            "id": 2
+            "id": 30001
         },
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM msgs_msg WHERE direction = 'I' and contact_id = 30000 AND text = 'Hola'",
-                "count": 1
+                "returns": 1
             }
-        ]
+        ],
+        "expected_tasks": {
+            "realtime/1": [
+                {
+                    "type": "handle_contact_event",
+                    "payload": {
+                        "contact_id": 30000
+                    }
+                }
+            ]
+        }
     },
     {
         "label": "duplicate message ignored",
         "method": "POST",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -84,19 +104,19 @@
         "status": 200,
         "response": {
             "duplicate": true,
-            "id": 2
+            "id": 30001
         },
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM msgs_msg WHERE direction = 'I' and contact_id = 30000 AND text = 'Hola'",
-                "count": 1
+                "returns": 1
             }
         ]
     },
     {
         "label": "invalid phone number creates 422 response",
         "method": "POST",
-        "path": "/mr/android/message",
+        "path": "/mi/android/message",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -115,7 +135,7 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM msgs_msg WHERE direction = 'I' and contact_id = 30000 AND text = 'Hola'",
-                "count": 1
+                "returns": 1
             }
         ]
     }

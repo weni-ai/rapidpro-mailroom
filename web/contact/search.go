@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/search", web.RequireAuthToken(web.JSONPayload(handleSearch)))
+	web.InternalRoute(http.MethodPost, "/contact/search", web.JSONPayload(handleSearch))
 }
 
 // Searches the contacts in an org
@@ -60,7 +60,7 @@ type searchResponse struct {
 func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, r.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	group := oa.GroupByID(r.GroupID)

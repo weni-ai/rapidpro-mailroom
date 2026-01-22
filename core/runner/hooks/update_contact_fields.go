@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
 // UpdateContactFields is our hook for contact field changes
@@ -20,15 +20,15 @@ var UpdateContactFields runner.PreCommitHook = &updateContactFields{}
 
 type updateContactFields struct{}
 
-func (h *updateContactFields) Order() int { return 1 }
+func (h *updateContactFields) Order() int { return 10 }
 
 func (h *updateContactFields) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	// our list of updates
 	fieldUpdates := make([]any, 0, len(scenes))
 	fieldDeletes := make(map[assets.FieldUUID][]any)
-	for scene, es := range scenes {
-		updates := make(map[assets.FieldUUID]*flows.Value, len(es))
-		for _, e := range es {
+	for scene, args := range scenes {
+		updates := make(map[assets.FieldUUID]*flows.Value, len(args))
+		for _, e := range args {
 			event := e.(*events.ContactFieldChanged)
 			field := oa.FieldByKey(event.Field.Key)
 			if field == nil {
@@ -99,12 +99,12 @@ type FieldValue struct {
 
 const sqlUpdateContactFields = `
 UPDATE contacts_contact c
-   SET fields = COALESCE(fields,'{}'::jsonb) || r.updates::jsonb
-  FROM (VALUES(:contact_id, :updates)) AS r(contact_id, updates)
- WHERE c.id = r.contact_id::int`
+   SET fields = COALESCE(fields,'{}'::jsonb) || r.updates
+  FROM (VALUES(:contact_id::int, :updates::jsonb)) AS r(contact_id, updates)
+ WHERE c.id = r.contact_id`
 
 const sqlDeleteContactFields = `
 UPDATE contacts_contact c
    SET fields = fields - r.field_uuid
-  FROM (VALUES(:contact_id, :field_uuid)) AS r(contact_id, field_uuid)
- WHERE c.id = r.contact_id::int`
+  FROM (VALUES(:contact_id::int, :field_uuid)) AS r(contact_id, field_uuid)
+ WHERE c.id = r.contact_id`

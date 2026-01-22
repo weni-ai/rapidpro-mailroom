@@ -1,0 +1,128 @@
+[
+    {
+        "label": "#1",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b47-2c93-76f8-bec9-e032f4f9af5f",
+                    "type": "contact_groups_changed",
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "groups_removed": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                },
+                {
+                    "uuid": "01969b47-3463-76f8-9853-0310d032b497",
+                    "type": "contact_groups_changed",
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "groups_added": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                }
+            ],
+            "cd024bcd-f473-4719-a00a-bd0bb1190135": [
+                {
+                    "uuid": "01969b47-a993-76f8-977d-88574316827e",
+                    "type": "contact_groups_changed",
+                    "created_on": "2025-05-04T12:31:28.123456789Z",
+                    "groups_added": [
+                        {
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
+                            "name": "Testers"
+                        }
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
+                "args": [
+                    10000,
+                    10005
+                ],
+                "returns": 0
+            },
+            {
+                "query": "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
+                "args": [
+                    10000,
+                    10006
+                ],
+                "returns": 1
+            },
+            {
+                "query": "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
+                "args": [
+                    10002,
+                    10006
+                ],
+                "returns": 1
+            },
+            {
+                "query": "select count(*) from contacts_contactgroup_contacts where contact_id = $1 and contactgroup_id = $2",
+                "args": [
+                    10001,
+                    10006
+                ],
+                "returns": 0
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-a993-76f8-977d-88574316827e",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:28Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:28.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-2c93-76f8-bec9-e032f4f9af5f",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:56Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-3463-76f8-9853-0310d032b497",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:58Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            }
+        ]
+    }
+]

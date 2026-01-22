@@ -1,0 +1,531 @@
+[
+    {
+        "label": "messages created in a flow",
+        "msgs": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": {
+                "urn": "tel:+16055741111",
+                "channel": {
+                    "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
+                    "name": "Twilio"
+                },
+                "text": "start"
+            }
+        },
+        "events": {},
+        "actions": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "type": "send_msg",
+                    "uuid": "088eddd3-b09c-477a-a9c2-2239445b0c48",
+                    "text": "Hello World",
+                    "quick_replies": [
+                        "yes",
+                        "no"
+                    ],
+                    "all_urns": true
+                }
+            ],
+            "b699a406-7e44-49be-9f01-1a82893e8a10": [
+                {
+                    "type": "send_msg",
+                    "uuid": "2c18d3c0-2500-4aeb-a4c3-d5d701c80809",
+                    "text": "No URNs"
+                }
+            ],
+            "cd024bcd-f473-4719-a00a-bd0bb1190135": [
+                {
+                    "type": "send_msg",
+                    "uuid": "ad680782-a90c-4a9f-b2a8-d0c8708a367b",
+                    "text": "Hello Attachments",
+                    "attachments": [
+                        "image/png:/images/image1.png"
+                    ],
+                    "all_urns": true
+                }
+            ],
+            "d709c157-4606-4d41-9df3-9e9c9b4ae2d4": [
+                {
+                    "type": "send_msg",
+                    "uuid": "64f31435-5f0a-4586-a748-156ad708e0ce",
+                    "text": "Template time",
+                    "template": {
+                        "uuid": "9c22b594-fcab-4b29-9bcb-ce4404894a80",
+                        "name": "revive_issue"
+                    },
+                    "template_variables": [
+                        "@contact.name",
+                        "tooth"
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT text, high_priority, quick_replies[1] AS qr1, quick_replies[2] AS qr2 FROM msgs_msg WHERE contact_id = 10000 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "high_priority": true,
+                    "qr1": "yes",
+                    "qr2": "no",
+                    "text": "Hello World"
+                }
+            },
+            {
+                "query": "SELECT text, status, failed_reason FROM msgs_msg WHERE contact_id = 10001 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "failed_reason": "D",
+                    "status": "F",
+                    "text": "No URNs"
+                }
+            },
+            {
+                "query": "SELECT text, attachments[1] AS att1, status, high_priority FROM msgs_msg WHERE contact_id = 10002 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "att1": "image/png:https://foo.bar.com/images/image1.png",
+                    "high_priority": false,
+                    "status": "Q",
+                    "text": "Hello Attachments"
+                }
+            },
+            {
+                "query": "SELECT text, channel_id, status, templating-\u003e'template'-\u003e\u003e'name' AS template_name FROM msgs_msg WHERE contact_id = 10003 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "channel_id": 10002,
+                    "status": "Q",
+                    "template_name": "revive_issue",
+                    "text": "Hi Dan, are you still experiencing problems with tooth?"
+                }
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-76cb-76f8-92ca-6e1d7f550554",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:15.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-72e3-76f8-92e8-a5e406ecb2a7",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-8e3b-76f8-a71b-fe4af29b871a",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:21.123456789Z",
+                    "msg": {
+                        "locale": "eng",
+                        "text": "No URNs",
+                        "unsendable_reason": "no_route"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01969b47-99f3-76f8-bfd7-d22404241e07",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:24.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-72e3-76f8-92e8-a5e406ecb2a7",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            },
+            {
+                "PK": "con#d709c157-4606-4d41-9df3-9e9c9b4ae2d4",
+                "SK": "evt#01969b48-036b-76f8-bf05-63393fd408f5",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:51.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-ff83-76f8-9e14-020037f6ddea",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#d709c157-4606-4d41-9df3-9e9c9b4ae2d4",
+                "SK": "evt#01969b48-1adb-76f8-88b2-5d345629f07f",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:57.123456789Z",
+                    "msg": {
+                        "channel": {
+                            "name": "Facebook",
+                            "uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
+                        },
+                        "locale": "eng-US",
+                        "templating": {
+                            "components": [
+                                {
+                                    "name": "body",
+                                    "type": "body/text",
+                                    "variables": {
+                                        "1": 0,
+                                        "2": 1
+                                    }
+                                }
+                            ],
+                            "template": {
+                                "name": "revive_issue",
+                                "uuid": "9c22b594-fcab-4b29-9bcb-ce4404894a80"
+                            },
+                            "variables": [
+                                {
+                                    "type": "text",
+                                    "value": "Dan"
+                                },
+                                {
+                                    "type": "text",
+                                    "value": "tooth"
+                                }
+                            ]
+                        },
+                        "text": "Hi Dan, are you still experiencing problems with tooth?",
+                        "urn": "facebook:12345"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#d709c157-4606-4d41-9df3-9e9c9b4ae2d4",
+                "SK": "evt#01969b48-2693-76f8-b8ba-60d66db82e39",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:32:00.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-ff83-76f8-9e14-020037f6ddea",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-bd1b-76f8-a5ef-59cf4d9d7a5b",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:33.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-b933-76f8-a09e-6806aab9f510",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-d48b-76f8-998e-ae5bd773804a",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:39.123456789Z",
+                    "msg": {
+                        "attachments": [
+                            "image/png:/images/image1.png"
+                        ],
+                        "channel": {
+                            "name": "Twilio",
+                            "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+                        },
+                        "locale": "eng-US",
+                        "text": "Hello Attachments",
+                        "urn": "tel:+16055743333"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#01969b47-e043-76f8-87bc-209e78511534",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:42.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-b933-76f8-a09e-6806aab9f510",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:46.123456789Z",
+                    "msg": {
+                        "channel": {
+                            "name": "Twilio",
+                            "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+                        },
+                        "text": "start",
+                        "urn": "tel:+16055741111"
+                    },
+                    "type": "msg_received"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-24c3-76f8-bef6-3979f99a96f9",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:54.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-20db-76f8-9014-2c868db4022e",
+                    "type": "run_started"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-401b-76f8-8768-7d0ba4d4f3e8",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:01.123456789Z",
+                    "msg": {
+                        "channel": {
+                            "name": "Twilio",
+                            "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+                        },
+                        "locale": "eng-US",
+                        "quick_replies": [
+                            {
+                                "text": "yes"
+                            },
+                            {
+                                "text": "no"
+                            }
+                        ],
+                        "text": "Hello World",
+                        "urn": "tel:+16055741111"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-47eb-76f8-b63d-c8dcc2fa9de0",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:03.123456789Z",
+                    "msg": {
+                        "channel": {
+                            "name": "Twilio",
+                            "uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+                        },
+                        "locale": "eng-US",
+                        "quick_replies": [
+                            {
+                                "text": "yes"
+                            },
+                            {
+                                "text": "no"
+                            }
+                        ],
+                        "text": "Hello World",
+                        "urn": "tel:+12065551212"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-53a3-76f8-8f9d-465efd6fbb5e",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:06.123456789Z",
+                    "flow": {
+                        "name": "Test Flow",
+                        "revision": 1,
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b47-20db-76f8-9014-2c868db4022e",
+                    "status": "completed",
+                    "type": "run_ended"
+                }
+            }
+        ]
+    },
+    {
+        "label": "messages created by a broadcast",
+        "broadcast_id": 30000,
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01999b41-7545-7210-b17e-a89e186f0160",
+                    "type": "msg_created",
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "msg": {
+                        "text": "Cats or dogs?",
+                        "quick_replies": [
+                            {
+                                "text": "Cats"
+                            },
+                            {
+                                "text": "Dogs"
+                            }
+                        ]
+                    },
+                    "broadcast_uuid": "01999b42-f414-7161-8814-fbef26d9d0d3"
+                }
+            ],
+            "b699a406-7e44-49be-9f01-1a82893e8a10": [
+                {
+                    "uuid": "01999b4d-cd1b-7bfe-853c-a56a4e373312",
+                    "type": "msg_created",
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "msg": {
+                        "text": "Cats or dogs?",
+                        "quick_replies": [
+                            {
+                                "text": "Cats"
+                            },
+                            {
+                                "text": "Dogs"
+                            }
+                        ]
+                    },
+                    "broadcast_uuid": "01999b42-f414-7161-8814-fbef26d9d0d3"
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT broadcast_id, text, high_priority, quick_replies[1] AS qr1, quick_replies[2] AS qr2 FROM msgs_msg WHERE contact_id = 10000 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "broadcast_id": 30000,
+                    "high_priority": false,
+                    "qr1": "Cats",
+                    "qr2": "Dogs",
+                    "text": "Cats or dogs?"
+                }
+            },
+            {
+                "query": "SELECT broadcast_id, text, high_priority, quick_replies[1] AS qr1, quick_replies[2] AS qr2 FROM msgs_msg WHERE contact_id = 10001 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "broadcast_id": 30000,
+                    "high_priority": false,
+                    "qr1": "Cats",
+                    "qr2": "Dogs",
+                    "text": "Cats or dogs?"
+                }
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#01999b4d-cd1b-7bfe-853c-a56a4e373312",
+                "OrgID": 1,
+                "Data": {
+                    "broadcast_uuid": "01999b42-f414-7161-8814-fbef26d9d0d3",
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "msg": {
+                        "quick_replies": [
+                            {
+                                "text": "Cats"
+                            },
+                            {
+                                "text": "Dogs"
+                            }
+                        ],
+                        "text": "Cats or dogs?"
+                    },
+                    "type": "msg_created"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01999b41-7545-7210-b17e-a89e186f0160",
+                "OrgID": 1,
+                "Data": {
+                    "broadcast_uuid": "01999b42-f414-7161-8814-fbef26d9d0d3",
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "msg": {
+                        "quick_replies": [
+                            {
+                                "text": "Cats"
+                            },
+                            {
+                                "text": "Dogs"
+                            }
+                        ],
+                        "text": "Cats or dogs?"
+                    },
+                    "type": "msg_created"
+                }
+            }
+        ]
+    },
+    {
+        "label": "chat message by user",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01999b52-f8e5-75dd-b63f-5099a530d6c9",
+                    "type": "msg_created",
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "msg": {
+                        "text": "How are you?"
+                    }
+                }
+            ]
+        },
+        "user_id": 3,
+        "db_assertions": [
+            {
+                "query": "SELECT text, high_priority FROM msgs_msg WHERE contact_id = 10000 ORDER BY id DESC LIMIT 1",
+                "columns": {
+                    "high_priority": true,
+                    "text": "How are you?"
+                }
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01999b52-f8e5-75dd-b63f-5099a530d6c9",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-30T12:30:00.123456789Z",
+                    "msg": {
+                        "text": "How are you?"
+                    },
+                    "type": "msg_created"
+                }
+            }
+        ]
+    }
+]

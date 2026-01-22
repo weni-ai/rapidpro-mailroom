@@ -2,7 +2,7 @@
     {
         "label": "error if fields not provided",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {},
         "status": 400,
         "response": {
@@ -12,11 +12,11 @@
     {
         "label": "query error if property not resolveable",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "birthday = tomorrow",
-            "group_id": 1
+            "group_id": 10000
         },
         "status": 422,
         "response": {
@@ -30,11 +30,11 @@
     {
         "label": "query error if property not convertable",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "age > tomorrow",
-            "group_id": 1
+            "group_id": 10000
         },
         "status": 422,
         "response": {
@@ -48,15 +48,15 @@
     {
         "label": "valid unstructured query",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
-            "query": "Cathy",
-            "group_id": 1
+            "query": "Ann",
+            "group_id": 10000
         },
         "status": 200,
         "response": {
-            "query": "name ~ \"Cathy\"",
+            "query": "name ~ \"Ann\"",
             "contact_ids": [
                 10000
             ],
@@ -75,11 +75,11 @@
     {
         "label": "can exclude specific contacts",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
-            "query": "Cathy OR George",
-            "group_id": 1,
+            "query": "Ann OR Cat",
+            "group_id": 10000,
             "exclude_ids": [
                 10001,
                 10002
@@ -87,7 +87,7 @@
         },
         "status": 200,
         "response": {
-            "query": "name ~ \"Cathy\" OR name ~ \"George\"",
+            "query": "name ~ \"Ann\" OR name ~ \"Cat\"",
             "contact_ids": [
                 10000
             ],
@@ -106,11 +106,11 @@
     {
         "label": "valid search on two fields",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "AGE = 10 and gender = M",
-            "group_id": 1
+            "group_id": 10000
         },
         "status": 200,
         "response": {
@@ -138,11 +138,11 @@
     {
         "label": "empty query on different group",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "",
-            "group_id": 10001
+            "group_id": 10006
         },
         "status": 200,
         "response": {
@@ -165,11 +165,11 @@
     {
         "label": "empty query on different group with limit",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "",
-            "group_id": 10001,
+            "group_id": 10006,
             "limit": 5
         },
         "status": 200,
@@ -188,11 +188,11 @@
     {
         "label": "empty query on different group with limit and sort",
         "method": "POST",
-        "path": "/mr/contact/search",
+        "path": "/mi/contact/search",
         "body": {
             "org_id": 1,
             "query": "",
-            "group_id": 10001,
+            "group_id": 10006,
             "limit": 5,
             "sort": "id"
         },

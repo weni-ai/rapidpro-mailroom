@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
+	"github.com/vinovest/sqlx"
 )
 
 type FlowRunID int64
@@ -38,7 +38,7 @@ var runStatusMap = map[flows.RunStatus]RunStatus{
 	flows.RunStatusFailed:    RunStatusFailed,
 }
 
-// FlowRun is the mailroom type for a FlowRun
+// FlowRun is the type for a run of a flow
 type FlowRun struct {
 	ID              FlowRunID         `db:"id"`
 	UUID            flows.RunUUID     `db:"uuid"`
@@ -56,9 +56,6 @@ type FlowRun struct {
 	OrgID           OrgID             `db:"org_id"`
 	SessionUUID     flows.SessionUUID `db:"session_uuid"`
 	StartID         StartID           `db:"start_id"`
-
-	// we keep a reference to the engine's run
-	run flows.Run
 }
 
 // NewRun creates a flow run we can save to the database
@@ -91,20 +88,11 @@ func NewRun(oa *OrgAssets, fs flows.Session, fr flows.Run) *FlowRun {
 		PathNodes:   pathNodes,
 		PathTimes:   pq.GenericArray{A: pathTimes},
 		Results:     string(jsonx.MustMarshal(fr.Results())),
-
-		run: fr,
+		Responded:   fr.HadInput(),
 	}
 
 	if len(pathNodes) > 0 && (fr.Status() == flows.RunStatusActive || fr.Status() == flows.RunStatusWaiting) {
 		r.CurrentNodeUUID = null.String(pathNodes[len(pathNodes)-1])
-	}
-
-	// mark ourselves as responded if we received a message
-	for _, e := range fr.Events() {
-		if e.Type() == events.TypeMsgReceived {
-			r.Responded = true
-			break
-		}
 	}
 
 	return r
@@ -131,19 +119,19 @@ UPDATE
 	flows_flowrun fr
 SET
 	status = r.status,
-	exited_on = r.exited_on::timestamptz,
-	responded = r.responded::bool,
+	exited_on = r.exited_on,
+	responded = r.responded,
 	results = r.results,
-	path_nodes = r.path_nodes::uuid[],
-	path_times = r.path_times::timestamptz[],
-	current_node_uuid = r.current_node_uuid::uuid,
+	path_nodes = r.path_nodes,
+	path_times = r.path_times,
+	current_node_uuid = r.current_node_uuid,
 	modified_on = NOW()
 FROM (
-	VALUES(:uuid, :status, :exited_on, :responded, :results, :path_nodes, :path_times, :current_node_uuid)
+	VALUES(:uuid::uuid, :status, :exited_on::timestamptz, :responded::bool, :results, :path_nodes::uuid[], :path_times::timestamptz[], :current_node_uuid::uuid)
 ) AS
 	r(uuid, status, exited_on, responded, results, path_nodes, path_times, current_node_uuid)
 WHERE
-	fr.uuid = r.uuid::uuid`
+	fr.uuid = r.uuid`
 
 func UpdateRuns(ctx context.Context, tx *sqlx.Tx, runs []*FlowRun) error {
 	if err := BulkQuery(ctx, "update runs", tx, sqlUpdateRun, runs); err != nil {
@@ -173,4 +161,39 @@ func GetContactIDsAtNode(ctx context.Context, rt *runtime.Runtime, orgID OrgID, 
 	}
 
 	return contactIDs, nil
+}
+
+type RunReference struct {
+	UUID flows.RunUUID
+	Flow *assets.FlowReference
+}
+
+const sqlSelectActiveAndWaitingRuns = `
+    SELECT r.session_uuid, r.uuid AS uuid, f.uuid AS flow_uuid, f.name AS flow_name
+      FROM flows_flowrun r
+INNER JOIN flows_flow f ON f.id = r.flow_id
+     WHERE session_uuid = ANY($1) AND status IN ('A', 'W')
+	 ORDER BY r.id`
+
+// GetActiveAndWaitingRuns gets references to the active/waiting runs for the given sessions
+func GetActiveAndWaitingRuns(ctx context.Context, rt *runtime.Runtime, sessionUUIDs []flows.SessionUUID) (map[flows.SessionUUID][]*RunReference, error) {
+	type envelope struct {
+		SessionUUID flows.SessionUUID `db:"session_uuid"`
+		UUID        flows.RunUUID     `db:"uuid"`
+		FlowUUID    assets.FlowUUID   `db:"flow_uuid"`
+		FlowName    string            `db:"flow_name"`
+	}
+
+	var all []*envelope
+
+	if err := rt.DB.SelectContext(ctx, &all, sqlSelectActiveAndWaitingRuns, pq.Array(sessionUUIDs)); err != nil {
+		return nil, fmt.Errorf("error fetching ongoing runs: %w", err)
+	}
+
+	runRefs := make(map[flows.SessionUUID][]*RunReference, len(sessionUUIDs))
+	for _, r := range all {
+		runRefs[r.SessionUUID] = append(runRefs[r.SessionUUID], &RunReference{UUID: r.UUID, Flow: assets.NewFlowReference(r.FlowUUID, r.FlowName)})
+	}
+
+	return runRefs, nil
 }

@@ -21,20 +21,20 @@ import (
 )
 
 func TestIncidentWebhooksUnhealthy(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 
 	id1, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.VK, oa, []flows.NodeUUID{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 	require.NoError(t, err)
 	assert.NotEqual(t, 0, id1)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertvk.SMembers(t, rc, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertvk.SMembers(t, vc, fmt.Sprintf("incident:%d:nodes", id1), []string{"5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// raising same incident doesn't create a new one...
 	id2, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.VK, oa, []flows.NodeUUID{"3b1743cd-bd8b-449e-8e8a-11a3bc479766"})
@@ -43,7 +43,7 @@ func TestIncidentWebhooksUnhealthy(t *testing.T) {
 
 	// but will add new nodes to the incident's node set
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM notifications_incident`).Returns(1)
-	assertvk.SMembers(t, rc, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
+	assertvk.SMembers(t, vc, fmt.Sprintf("incident:%d:nodes", id1), []string{"3b1743cd-bd8b-449e-8e8a-11a3bc479766", "5a2e83f1-efa8-40ba-bc0c-8873c525de7d", "aba89043-6f0a-4ccf-ba7f-0e1674b90759"})
 
 	// when the incident has ended, a new one can be created
 	rt.DB.MustExec(`UPDATE notifications_incident SET ended_on = NOW()`)
@@ -57,12 +57,12 @@ func TestIncidentWebhooksUnhealthy(t *testing.T) {
 }
 
 func TestGetOpenIncidents(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	oa1 := testdb.Org1.Load(rt)
-	oa2 := testdb.Org2.Load(rt)
+	oa1 := testdb.Org1.Load(t, rt)
+	oa2 := testdb.Org2.Load(t, rt)
 
 	// create incident for org 1
 	id1, err := models.IncidentWebhooksUnhealthy(ctx, rt.DB, rt.VK, oa1, nil)
@@ -98,9 +98,9 @@ func TestGetOpenIncidents(t *testing.T) {
 }
 
 func TestWebhookNode(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey)
 
 	node := &models.WebhookNode{UUID: "3c703019-8c92-4d28-9be0-a926a934486b"}
 	healthy, err := node.Healthy(ctx, rt)

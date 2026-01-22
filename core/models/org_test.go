@@ -18,9 +18,9 @@ import (
 )
 
 func TestLoadOrg(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	tz, _ := time.LoadLocation("America/Los_Angeles")
 
@@ -33,23 +33,23 @@ func TestLoadOrg(t *testing.T) {
 	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{}' WHERE id = $1`, testdb.Org2.ID)
 	rt.DB.MustExec(`UPDATE orgs_org SET date_format = 'M' WHERE id = $1`, testdb.Org2.ID)
 
-	org, err := models.LoadOrg(ctx, rt.DB.DB, testdb.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org1.ID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, models.OrgID(1), org.ID())
 	assert.False(t, org.Suspended())
 	assert.Equal(t, "smtp://foo:bar", org.FlowSMTP())
-	assert.Equal(t, 0, org.OutboxCount())
 	assert.Equal(t, envs.DateFormatDayMonthYear, org.Environment().DateFormat())
 	assert.Equal(t, envs.TimeFormatHourMinute, org.Environment().TimeFormat())
 	assert.Equal(t, envs.RedactionPolicyNone, org.Environment().RedactionPolicy())
+	assert.Equal(t, [4]uint32{0xA3B1C, 0xD2E3F, 0x1A2B3, 0xC0FFEE}, org.Environment().ObfuscationKey())
 	assert.Equal(t, "US", string(org.Environment().DefaultCountry()))
 	assert.Equal(t, tz, org.Environment().Timezone())
 	assert.Equal(t, []i18n.Language{"fra", "eng"}, org.Environment().AllowedLanguages())
 	assert.Equal(t, i18n.Language("fra"), org.Environment().DefaultLanguage())
 	assert.Equal(t, i18n.Locale("fra-US"), org.Environment().DefaultLocale())
 
-	org, err = models.LoadOrg(ctx, rt.DB.DB, testdb.Org2.ID)
+	org, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org2.ID)
 	assert.NoError(t, err)
 	assert.True(t, org.Suspended())
 	assert.Equal(t, "", org.FlowSMTP())
@@ -57,19 +57,19 @@ func TestLoadOrg(t *testing.T) {
 	assert.Equal(t, []i18n.Language{}, org.Environment().AllowedLanguages())
 	assert.Equal(t, i18n.NilLanguage, org.Environment().DefaultLanguage())
 	assert.Equal(t, i18n.NilLocale, org.Environment().DefaultLocale())
+	assert.Equal(t, [4]uint32{0xA3B1C, 0xD2E3F, 0x1A2B3, 0xC0FFEE}, org.Environment().ObfuscationKey())
 
-	_, err = models.LoadOrg(ctx, rt.DB.DB, 99)
+	_, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, 99)
 	assert.EqualError(t, err, "no org with id: 99")
 }
 
 func TestGetOrgIDFromUUID(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	// mark org 2 deleted
 	rt.DB.MustExec(`UPDATE orgs_org SET is_active = FALSE WHERE id = $1`, testdb.Org2.ID)
-	models.FlushCache()
 
 	orgID, err := models.GetOrgIDFromUUID(ctx, rt.DB.DB, models.OrgUUID(testdb.Org1.UUID))
 	require.NoError(t, err)
@@ -82,17 +82,16 @@ func TestGetOrgIDFromUUID(t *testing.T) {
 }
 
 func TestEmailService(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	// make org 2 a child of org 1
 	rt.DB.MustExec(`UPDATE orgs_org SET parent_id = $2 WHERE id = $1`, testdb.Org2.ID, testdb.Org1.ID)
-	models.FlushCache()
 
-	org1, err := models.LoadOrg(ctx, rt.DB.DB, testdb.Org1.ID)
+	org1, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org1.ID)
 	require.NoError(t, err)
-	org2, err := models.LoadOrg(ctx, rt.DB.DB, testdb.Org2.ID)
+	org2, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org2.ID)
 	require.NoError(t, err)
 
 	// no SMTP config by default.. no email service
@@ -111,7 +110,7 @@ func TestEmailService(t *testing.T) {
 	rt.DB.MustExec(`UPDATE orgs_org SET flow_smtp = 'smtp://zed:123@flows.com?from=foo%40flows.com' WHERE id = $1`, testdb.Org1.ID)
 	models.FlushCache()
 
-	org1, err = models.LoadOrg(ctx, rt.DB.DB, testdb.Org1.ID)
+	org1, err = models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org1.ID)
 	require.NoError(t, err)
 
 	svc, err = org1.EmailService(ctx, rt, nil)
@@ -125,22 +124,38 @@ func TestEmailService(t *testing.T) {
 }
 
 func TestStoreAttachment(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetStorage)
+	defer testsuite.Reset(t, rt, testsuite.ResetStorage)
 
 	image, err := os.Open("testdata/test.jpg")
 	require.NoError(t, err)
 
-	org, err := models.LoadOrg(ctx, rt.DB.DB, testdb.Org1.ID)
+	org, err := models.LoadOrg(ctx, rt.Config, rt.DB.DB, testdb.Org1.ID)
 	assert.NoError(t, err)
 
 	attachment, err := org.StoreAttachment(context.Background(), rt, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)
 	require.NoError(t, err)
 
-	assert.Equal(t, utils.Attachment("image/jpeg:http://localhost:9000/test-attachments/attachments/1/6683/83ba/668383ba-387c-49bc-b164-1213ac0ea7aa.jpg"), attachment)
+	assert.Equal(t, utils.Attachment("image/jpeg:http://localstack:4566/test-attachments/attachments/1/6683/83ba/668383ba-387c-49bc-b164-1213ac0ea7aa.jpg"), attachment)
 
 	// err trying to read from same reader again
 	_, err = org.StoreAttachment(context.Background(), rt, "668383ba-387c-49bc-b164-1213ac0ea7aa.jpg", "image/jpeg", image)
 	assert.EqualError(t, err, "unable to read attachment content: read testdata/test.jpg: file already closed")
+}
+
+func TestGetOutboxCounts(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
+
+	rt.DB.MustExec(`INSERT INTO orgs_itemcount(org_id, scope, count, is_squashed) VALUES ($1, 'msgs:folder:O', -1, FALSE)`, testdb.Org1.ID)
+	rt.DB.MustExec(`INSERT INTO orgs_itemcount(org_id, scope, count, is_squashed) VALUES ($1, 'msgs:folder:O', 2, FALSE)`, testdb.Org1.ID)
+	rt.DB.MustExec(`INSERT INTO orgs_itemcount(org_id, scope, count, is_squashed) VALUES ($1, 'msgs:folder:O', 3, FALSE)`, testdb.Org1.ID)
+	rt.DB.MustExec(`INSERT INTO orgs_itemcount(org_id, scope, count, is_squashed) VALUES ($1, 'msgs:folder:S', 3, FALSE)`, testdb.Org1.ID)
+	rt.DB.MustExec(`INSERT INTO orgs_itemcount(org_id, scope, count, is_squashed) VALUES ($1, 'msgs:folder:O', 2, FALSE)`, testdb.Org2.ID)
+
+	counts, err := models.GetOutboxCounts(ctx, rt.DB.DB, []models.OrgID{testdb.Org1.ID, testdb.Org2.ID, 3})
+	assert.NoError(t, err)
+	assert.Equal(t, map[models.OrgID]int{testdb.Org1.ID: 4, testdb.Org2.ID: 2}, counts)
 }

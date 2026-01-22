@@ -11,12 +11,12 @@ import (
 )
 
 func TestOptIns(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	polls := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
-	offers := testdb.InsertOptIn(rt, testdb.Org1, "Offers")
+	polls := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
+	offers := testdb.InsertOptIn(t, rt, testdb.Org1, "7fda7c97-4484-445d-8418-66fed031f82d", "Offers")
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshOptIns)
 	require.NoError(t, err)
