@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
@@ -12,6 +11,7 @@ import (
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/starts"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
 // CreateFlowStarts is our hook to fire our scene starts
@@ -19,15 +19,11 @@ var CreateFlowStarts runner.PreCommitHook = &createFlowStarts{}
 
 type createFlowStarts struct{}
 
-func (h *createFlowStarts) Order() int { return 1 }
+func (h *createFlowStarts) Order() int { return 10 }
 
 func (h *createFlowStarts) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
-	rc := rt.VK.Get()
-	defer rc.Close()
-
-	// for each of our scene
-	for _, es := range scenes {
-		for _, e := range es {
+	for _, args := range scenes {
+		for _, e := range args {
 			event := e.(*events.SessionTriggered)
 
 			// look up our flow
@@ -68,15 +64,9 @@ func (h *createFlowStarts) Execute(ctx context.Context, rt *runtime.Runtime, tx 
 				WithParentSummary(event.RunSummary).
 				WithSessionHistory(historyJSON)
 
-			// TODO find another way to pass start info to new calls
-			if flow.FlowType() == models.FlowTypeVoice {
-				if err := models.InsertFlowStarts(ctx, tx, []*models.FlowStart{start}); err != nil {
-					return fmt.Errorf("error inserting flow start: %w", err)
-				}
-			}
-
-			err = tasks.Queue(rc, tasks.BatchQueue, oa.OrgID(), &starts.StartFlowTask{FlowStart: start}, false)
-			if err != nil {
+			// and a task to process it
+			task := &starts.StartFlowTask{FlowStart: start}
+			if err := tasks.Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), task, false); err != nil {
 				return fmt.Errorf("error queuing flow start: %w", err)
 			}
 		}

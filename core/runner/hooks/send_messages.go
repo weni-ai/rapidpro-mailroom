@@ -14,26 +14,28 @@ var SendMessages runner.PostCommitHook = &sendMessages{}
 
 type sendMessages struct{}
 
-func (h *sendMessages) Order() int { return 1 }
+func (h *sendMessages) Order() int { return 10 }
 
 func (h *sendMessages) Execute(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	msgs := make([]*models.MsgOut, 0, len(scenes))
 
 	// for each scene gather all our messages
 	for s, args := range scenes {
-		sceneMsgs := make([]*models.MsgOut, 0, 1)
+		sceneMsgs := make([]*models.MsgOut, len(args))
 
-		for _, m := range args {
+		for i, m := range args {
 			msg := m.(*models.MsgOut)
 			msg.Session = s.Session
 			msg.WaitTimeout = s.WaitTimeout
 			msg.SprintUUID = s.SprintUUID()
 
-			sceneMsgs = append(sceneMsgs, msg)
-		}
+			// mark the last message in the sprint (used for setting timeouts)
+			if i == len(args)-1 {
+				msg.LastInSprint = true
+			}
 
-		// mark the last message in the sprint (used for setting timeouts)
-		sceneMsgs[len(sceneMsgs)-1].LastInSprint = true
+			sceneMsgs[i] = msg
+		}
 
 		msgs = append(msgs, sceneMsgs...)
 	}

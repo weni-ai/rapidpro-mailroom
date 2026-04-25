@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -19,11 +20,11 @@ import (
 )
 
 func TestBroadcasts(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	optIn := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
+	optIn := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
 
 	bcast := models.NewBroadcast(
 		testdb.Org1.ID,
@@ -32,7 +33,7 @@ func TestBroadcasts(t *testing.T) {
 		true,
 		optIn.ID,
 		[]models.GroupID{testdb.DoctorsGroup.ID},
-		[]models.ContactID{testdb.Alexandra.ID, testdb.Bob.ID, testdb.Cathy.ID},
+		[]models.ContactID{testdb.Dan.ID, testdb.Bob.ID, testdb.Ann.ID},
 		[]urns.URN{"tel:+593979012345"},
 		"age > 33",
 		models.NoExclusions,
@@ -53,7 +54,7 @@ func TestBroadcasts(t *testing.T) {
 
 	err = bcast.SetQueued(ctx, rt.DB, 5)
 	assert.NoError(t, err)
-	assertdb.Query(t, rt.DB, `SELECT status, contact_count FROM msgs_broadcast WHERE id = $1`, bcast.ID).Columns(map[string]any{"status": "Q", "contact_count": int64(5)})
+	assertdb.Query(t, rt.DB, `SELECT status, contact_count FROM msgs_broadcast WHERE id = $1`, bcast.ID).Columns(map[string]any{"status": "Q", "contact_count": 5})
 
 	err = bcast.SetStarted(ctx, rt.DB)
 	assert.NoError(t, err)
@@ -69,18 +70,18 @@ func TestBroadcasts(t *testing.T) {
 }
 
 func TestInsertChildBroadcast(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	optIn := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
-	schedID := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodDaily, time.Now())
-	bcastID := testdb.InsertBroadcast(rt, testdb.Org1, `eng`, map[i18n.Language]string{`eng`: "Hello"}, optIn, schedID, []*testdb.Contact{testdb.Bob, testdb.Cathy}, nil)
+	optIn := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
+	schedID := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodDaily, time.Now())
+	bcast := testdb.InsertBroadcast(t, rt, testdb.Org1, "0199877e-0ed2-790b-b474-35099cea401c", `eng`, map[i18n.Language]string{`eng`: "Hello"}, optIn, schedID, []*testdb.Contact{testdb.Bob, testdb.Ann}, nil)
 
 	var bj json.RawMessage
 	err := rt.DB.GetContext(ctx, &bj, `SELECT ROW_TO_JSON(r) FROM (
 		SELECT id, org_id, translations, base_language, optin_id, template_id, template_variables, query, created_by_id, parent_id FROM msgs_broadcast WHERE id = $1
-	) r`, bcastID)
+	) r`, bcast.ID)
 	require.NoError(t, err)
 
 	parent := &models.Broadcast{}
@@ -97,12 +98,12 @@ func TestInsertChildBroadcast(t *testing.T) {
 }
 
 func TestNonPersistentBroadcasts(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
 	translations := flows.BroadcastTranslations{"eng": {Text: "Hi there"}}
-	optIn := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
+	optIn := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
 
 	// create a broadcast which doesn't actually exist in the DB
 	bcast := models.NewBroadcast(
@@ -112,7 +113,7 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 		true,
 		optIn.ID,
 		[]models.GroupID{testdb.DoctorsGroup.ID},
-		[]models.ContactID{testdb.Alexandra.ID, testdb.Bob.ID, testdb.Cathy.ID},
+		[]models.ContactID{testdb.Dan.ID, testdb.Bob.ID, testdb.Ann.ID},
 		[]urns.URN{"tel:+593979012345"},
 		"",
 		models.NoExclusions,
@@ -125,85 +126,104 @@ func TestNonPersistentBroadcasts(t *testing.T) {
 	assert.Equal(t, translations, bcast.Translations)
 	assert.Equal(t, optIn.ID, bcast.OptInID)
 	assert.Equal(t, []models.GroupID{testdb.DoctorsGroup.ID}, bcast.GroupIDs)
-	assert.Equal(t, []models.ContactID{testdb.Alexandra.ID, testdb.Bob.ID, testdb.Cathy.ID}, bcast.ContactIDs)
+	assert.Equal(t, []models.ContactID{testdb.Dan.ID, testdb.Bob.ID, testdb.Ann.ID}, bcast.ContactIDs)
 	assert.Equal(t, []urns.URN{"tel:+593979012345"}, bcast.URNs)
 	assert.Equal(t, "", bcast.Query)
 	assert.Equal(t, models.NoExclusions, bcast.Exclusions)
 
-	batch := bcast.CreateBatch([]models.ContactID{testdb.Alexandra.ID, testdb.Bob.ID}, true, false)
+	batch := bcast.CreateBatch([]models.ContactID{testdb.Dan.ID, testdb.Bob.ID}, true, false)
 
 	assert.Equal(t, models.NilBroadcastID, batch.BroadcastID)
 	assert.NotNil(t, testdb.Org1.ID, batch.Broadcast)
-	assert.Equal(t, []models.ContactID{testdb.Alexandra.ID, testdb.Bob.ID}, batch.ContactIDs)
-
-	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
-	require.NoError(t, err)
-
-	msgs, err := bcast.CreateMessages(ctx, rt, oa, batch)
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, len(msgs))
-
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE direction = 'O' AND broadcast_id IS NULL AND text = 'Hi there'`).Returns(2)
+	assert.Equal(t, []models.ContactID{testdb.Dan.ID, testdb.Bob.ID}, batch.ContactIDs)
 }
 
-func TestBroadcastBatchCreateMessage(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+func TestBroadcastSend(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetValkey)
-
-	polls := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshOptIns)
 	require.NoError(t, err)
 
+	test.MockUniverse()
+
 	tcs := []struct {
-		contactLanguage      i18n.Language
-		contactURN           urns.URN
-		translations         flows.BroadcastTranslations
-		baseLanguage         i18n.Language
-		expressions          bool
-		optInID              models.OptInID
-		templateID           models.TemplateID
-		templateVariables    []string
-		expectedText         string
-		expectedAttachments  []utils.Attachment
-		expectedQuickReplies []flows.QuickReply
-		expectedLocale       i18n.Locale
-		expectedError        string
+		contactLanguage   i18n.Language
+		contactURN        urns.URN
+		translations      flows.BroadcastTranslations
+		baseLanguage      i18n.Language
+		expressions       bool
+		optInID           models.OptInID
+		templateID        models.TemplateID
+		templateVariables []string
+		expected          []byte
 	}{
 		{ // 0
-			contactURN:           "tel:+593979000000",
-			contactLanguage:      i18n.NilLanguage,
-			translations:         flows.BroadcastTranslations{"eng": {Text: "Hi @contact"}},
-			baseLanguage:         "eng",
-			expressions:          false,
-			expectedText:         "Hi @contact",
-			expectedAttachments:  []utils.Attachment{},
-			expectedQuickReplies: []flows.QuickReply{},
-			expectedLocale:       "eng-EC",
+			contactURN:      "tel:+593979000000",
+			contactLanguage: i18n.NilLanguage,
+			translations:    flows.BroadcastTranslations{"eng": {Text: "Hi @contact"}},
+			baseLanguage:    "eng",
+			expressions:     false,
+			expected: []byte(`{
+				"uuid": "01969b47-0d53-76f8-9c0b-2014ddc77094",
+				"type": "msg_created",
+				"created_on": "2025-05-04T12:30:48.123456789Z",
+				"msg": {
+					"urn": "tel:+593979000000",
+					"channel": {
+						"uuid": "8e7b62ee-2e84-4601-8fef-2e44c490b43e",
+						"name": "Android"
+					},
+					"text": "Hi @contact",
+					"locale": "eng-EC"
+				},
+				"broadcast_uuid": "01969b47-0583-76f8-bd38-d266ec8d3716"
+			}`),
 		},
 		{ // 1: contact language not set, uses base language
-			contactURN:           "tel:+593979000001",
-			contactLanguage:      i18n.NilLanguage,
-			translations:         flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
-			baseLanguage:         "eng",
-			expressions:          true,
-			expectedText:         "Hello Felix",
-			expectedAttachments:  []utils.Attachment{},
-			expectedQuickReplies: []flows.QuickReply{},
-			expectedLocale:       "eng-EC",
+			contactURN:      "tel:+593979000001",
+			contactLanguage: i18n.NilLanguage,
+			translations:    flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
+			baseLanguage:    "eng",
+			expressions:     true,
+			expected: []byte(`{
+				"uuid": "01969b47-1cf3-76f8-8f41-6b2d9f33d623",
+				"type": "msg_created",
+				"created_on": "2025-05-04T12:30:52.123456789Z",
+				"msg": {
+					"urn": "tel:+593979000001",
+					"channel": {
+						"uuid": "8e7b62ee-2e84-4601-8fef-2e44c490b43e",
+						"name": "Android"
+					},
+					"text": "Hello Felix",
+					"locale": "eng-EC"
+				},
+				"broadcast_uuid": "01969b47-1523-76f8-8228-9728778b6c98"
+			}`),
 		},
 		{ // 2: contact language iggnored if it isn't a valid org language, even if translation exists
-			contactURN:           "tel:+593979000002",
-			contactLanguage:      "spa",
-			translations:         flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
-			baseLanguage:         "eng",
-			expressions:          true,
-			expectedText:         "Hello Felix",
-			expectedAttachments:  []utils.Attachment{},
-			expectedQuickReplies: []flows.QuickReply{},
-			expectedLocale:       "eng-EC",
+			contactURN:      "tel:+593979000002",
+			contactLanguage: "spa",
+			translations:    flows.BroadcastTranslations{"eng": {Text: "Hello @contact.name"}, "spa": {Text: "Hola @contact.name"}},
+			baseLanguage:    "eng",
+			expressions:     true,
+			expected: []byte(`{
+				"uuid": "01969b47-2c93-76f8-b86e-4b881f09a186",
+				"type": "msg_created",
+				"created_on": "2025-05-04T12:30:56.123456789Z",
+				"msg": {
+					"urn": "tel:+593979000002",
+					"channel": {
+						"uuid": "8e7b62ee-2e84-4601-8fef-2e44c490b43e",
+						"name": "Android"
+					},
+					"text": "Hello Felix",
+					"locale": "eng-EC"
+				},
+				"broadcast_uuid": "01969b47-24c3-76f8-ba00-bd7f0d08e671"
+			}`),
 		},
 		{ // 3: contact language used
 			contactURN:      "tel:+593979000003",
@@ -212,45 +232,93 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []flows.QuickReply{{Text: "yes"}, {Text: "no"}}},
 				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []flows.QuickReply{{Text: "oui"}, {Text: "no"}}},
 			},
-			baseLanguage:         "eng",
-			expressions:          true,
-			expectedText:         "Bonjour Felix",
-			expectedAttachments:  []utils.Attachment{"audio/mp3:http://test.fr.mp3"},
-			expectedQuickReplies: []flows.QuickReply{{Text: "oui"}, {Text: "no"}},
-			expectedLocale:       "fra-EC",
+			baseLanguage: "eng",
+			expressions:  true,
+			expected: []byte(`{
+				"uuid": "01969b47-3c33-76f8-8dbf-00ecf5d03034",
+				"type": "msg_created",
+				"created_on": "2025-05-04T12:31:00.123456789Z",
+				"msg": {
+					"urn": "tel:+593979000003",
+					"channel": {
+						"uuid": "8e7b62ee-2e84-4601-8fef-2e44c490b43e",
+						"name": "Android"
+					},
+					"text": "Bonjour Felix",
+					"attachments": [
+						"audio/mp3:http://test.fr.mp3"
+					],
+					"quick_replies": [
+						{
+							"text": "oui"
+						},
+						{
+							"text": "no"
+						}
+					],
+					"locale": "fra-EC"
+				},
+				"broadcast_uuid": "01969b47-3463-76f8-bebe-b4a1f677cf4c"
+			}`),
 		},
-		{ // 5: broadcast with optin
-			contactURN:           "facebook:1000000000001",
-			contactLanguage:      i18n.NilLanguage,
-			translations:         flows.BroadcastTranslations{"eng": {Text: "Hi @contact"}},
-			baseLanguage:         "eng",
-			expressions:          true,
-			optInID:              polls.ID,
-			expectedText:         "Hi Felix",
-			expectedAttachments:  []utils.Attachment{},
-			expectedQuickReplies: []flows.QuickReply{},
-			expectedLocale:       "eng",
-		},
-		{ // 6: broadcast with template
-			contactURN:           "facebook:1000000000002",
-			contactLanguage:      "eng",
-			translations:         flows.BroadcastTranslations{"eng": {Text: "Hi @contact"}},
-			baseLanguage:         "eng",
-			expressions:          true,
-			templateID:           testdb.ReviveTemplate.ID,
-			templateVariables:    []string{"@contact.name", "mice"},
-			expectedText:         "Hi Felix, are you still experiencing problems with mice?",
-			expectedAttachments:  []utils.Attachment{},
-			expectedQuickReplies: []flows.QuickReply{},
-			expectedLocale:       "eng-US",
+		{ // 4: broadcast with template
+			contactURN:        "facebook:1000000000002",
+			contactLanguage:   "eng",
+			translations:      flows.BroadcastTranslations{"eng": {Text: "Hi @contact"}},
+			baseLanguage:      "eng",
+			expressions:       true,
+			templateID:        testdb.ReviveTemplate.ID,
+			templateVariables: []string{"@contact.name", "mice"},
+			expected: []byte(`{
+				"uuid": "01969b47-4bd3-76f8-9654-8a7258fbaae4",
+				"type": "msg_created",
+				"created_on": "2025-05-04T12:31:04.123456789Z",
+				"msg": {
+					"urn": "facebook:1000000000002",
+					"channel": {
+						"uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91",
+						"name": "Facebook"
+					},
+					"text": "Hi Felix, are you still experiencing problems with mice?",
+					"templating": {
+						"template": {
+							"uuid": "9c22b594-fcab-4b29-9bcb-ce4404894a80",
+							"name": "revive_issue"
+						},
+						"components": [
+							{
+								"name": "body",
+								"type": "body/text",
+								"variables": {
+									"1": 0,
+									"2": 1
+								}
+							}
+						],
+						"variables": [
+							{
+								"type": "text",
+								"value": "Felix"
+							},
+							{
+								"type": "text",
+								"value": "mice"
+							}
+						]
+					},
+					"locale": "eng-US"
+				},
+				"broadcast_uuid": "01969b47-4403-76f8-afcb-91a2073e5459"
+			}`),
 		},
 	}
 
 	for i, tc := range tcs {
-		contact := testdb.InsertContact(rt, testdb.Org1, flows.NewContactUUID(), "Felix", tc.contactLanguage, models.ContactStatusActive)
-		testdb.InsertContactURN(rt, testdb.Org1, contact, tc.contactURN, 1000, nil)
+		contact := testdb.InsertContact(t, rt, testdb.Org1, flows.NewContactUUID(), "Felix", tc.contactLanguage, models.ContactStatusActive)
+		testdb.InsertContactURN(t, rt, testdb.Org1, contact, tc.contactURN, 1000, nil)
 
 		bcast := &models.Broadcast{
+			UUID:              flows.NewBroadcastUUID(),
 			OrgID:             testdb.Org1.ID,
 			Translations:      tc.translations,
 			BaseLanguage:      tc.baseLanguage,
@@ -262,25 +330,11 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 		err = models.InsertBroadcast(ctx, rt.DB, bcast)
 		require.NoError(t, err)
 
-		batch := &models.BroadcastBatch{
-			BroadcastID: bcast.ID,
-			Broadcast:   bcast,
-			ContactIDs:  []models.ContactID{contact.ID},
-			IsLast:      true,
-		}
+		_, ec, _ := contact.Load(t, rt, oa)
 
-		msgs, err := bcast.CreateMessages(ctx, rt, oa, batch)
-		if tc.expectedError != "" {
-			assert.EqualError(t, err, tc.expectedError, "error mismatch in test case %d", i)
-		} else {
-			assert.NoError(t, err, "unexpected error in test case %d", i)
-			if assert.Len(t, msgs, 1, "msg count mismatch in test case %d", i) {
-				assert.Equal(t, tc.expectedText, msgs[0].Text(), "%d: msg text mismatch", i)
-				assert.Equal(t, tc.expectedAttachments, msgs[0].Attachments(), "%d: attachments mismatch", i)
-				assert.Equal(t, tc.expectedQuickReplies, msgs[0].QuickReplies(), "%d: quick replies mismatch", i)
-				assert.Equal(t, tc.expectedLocale, msgs[0].Locale(), "%d: msg locale mismatch", i)
-				assert.Equal(t, tc.optInID, msgs[0].OptInID(), "%d: optin id mismatch", i)
-			}
-		}
+		evt, err := bcast.Send(rt, oa, ec)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, string(tc.expected), string(jsonx.MustMarshal(evt)), "%d: msg json mismatch", i)
 	}
 }

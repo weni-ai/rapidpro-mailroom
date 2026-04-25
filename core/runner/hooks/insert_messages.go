@@ -4,33 +4,33 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
-// InsertMessages is our hook for comitting scene messages
+// InsertMessages is our hook for committing scene messages
 var InsertMessages runner.PreCommitHook = &insertMessages{}
 
 type insertMessages struct{}
 
-func (h *insertMessages) Order() int { return 1 }
+func (h *insertMessages) Order() int { return 20 } // after our urn creation hook
 
 func (h *insertMessages) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	msgs := make([]*models.Msg, 0, len(scenes))
-	for scene, s := range scenes {
-		for _, m := range s {
+	for scene, args := range scenes {
+		for _, m := range args {
 			msg, urn := m.(MsgAndURN).Msg, m.(MsgAndURN).URN
 
 			// if a URN was added during the flow sprint, message won't have an URN ID which we need to insert it
 			if msg.ContactURNID() == models.NilURNID && urn != urns.NilURN {
-				urn, err := models.GetOrCreateURN(ctx, tx, oa, scene.ContactID(), urn)
+				cu, err := models.CreateOrStealURN(ctx, tx, oa, scene.ContactID(), urn)
 				if err != nil {
-					return fmt.Errorf("error to getting URN: %s: %w", urn, err)
+					return fmt.Errorf("error creating new URN %s for message: %w", urn, err)
 				}
-				msg.SetURN(urn) // extracts id from param
+				msg.SetContactURNID(cu.ID)
 			}
 
 			msgs = append(msgs, msg)

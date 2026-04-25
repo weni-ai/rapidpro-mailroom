@@ -2,7 +2,7 @@
     {
         "label": "noop",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -16,9 +16,9 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
-                        "name": "Cathy",
+                        "name": "Ann",
                         "status": "active",
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z"
@@ -30,15 +30,15 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Cathy'",
-                "count": 1
+                "query": "SELECT name FROM contacts_contact WHERE id = 10000",
+                "returns": "Ann"
             }
         ]
     },
     {
         "label": "set name",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 1,
@@ -57,7 +57,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "name": "Kathy",
                         "status": "active",
@@ -68,7 +68,7 @@
                         {
                             "uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
                             "type": "contact_name_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:46.123456789Z",
                             "name": "Kathy"
                         }
                     ]
@@ -78,15 +78,28 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Kathy'",
-                "count": 1
+                "query": "SELECT name FROM contacts_contact WHERE id = 10000",
+                "returns": "Kathy"
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:46Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:46.123456789Z",
+                    "name": "Kathy",
+                    "type": "contact_name_changed"
+                }
             }
         ]
     },
     {
         "label": "set name",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -105,7 +118,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "name": "Nate",
                         "status": "active",
@@ -114,9 +127,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-096b-76f8-bd38-d266ec8d3716",
+                            "uuid": "01969b47-0d53-76f8-bd38-d266ec8d3716",
                             "type": "contact_name_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:48.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "name": "Nate"
                         }
                     ]
@@ -126,15 +143,32 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name = 'Nate'",
-                "count": 1
+                "query": "SELECT name FROM contacts_contact WHERE id = 10000",
+                "returns": "Nate"
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0d53-76f8-bd38-d266ec8d3716",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:48Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:48.123456789Z",
+                    "name": "Nate",
+                    "type": "contact_name_changed"
+                }
             }
         ]
     },
     {
         "label": "clear name",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -153,7 +187,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -161,9 +195,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-0d53-76f8-9c0b-2014ddc77094",
+                            "uuid": "01969b47-1523-76f8-9c0b-2014ddc77094",
                             "type": "contact_name_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:50.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "name": ""
                         }
                     ]
@@ -174,14 +212,31 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND name IS NULL",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-1523-76f8-9c0b-2014ddc77094",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:50Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:50.123456789Z",
+                    "name": "",
+                    "type": "contact_name_changed"
+                }
             }
         ]
     },
     {
         "label": "set status to blocked",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -200,7 +255,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "blocked",
                         "timezone": "America/Los_Angeles",
@@ -208,9 +263,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-113b-76f8-92a3-d648ab64bccb",
+                            "uuid": "01969b47-1cf3-76f8-92a3-d648ab64bccb",
                             "type": "contact_status_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:52.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "status": "blocked"
                         }
                     ]
@@ -221,14 +280,30 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'B'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-1cf3-76f8-92a3-d648ab64bccb",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:52.123456789Z",
+                    "status": "blocked",
+                    "type": "contact_status_changed"
+                }
             }
         ]
     },
     {
         "label": "set status to archived",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -247,7 +322,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "archived",
                         "timezone": "America/Los_Angeles",
@@ -255,9 +330,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-1523-76f8-8228-9728778b6c98",
+                            "uuid": "01969b47-24c3-76f8-8228-9728778b6c98",
                             "type": "contact_status_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:54.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "status": "archived"
                         }
                     ]
@@ -268,14 +347,30 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'V'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-24c3-76f8-8228-9728778b6c98",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:54.123456789Z",
+                    "status": "archived",
+                    "type": "contact_status_changed"
+                }
             }
         ]
     },
     {
         "label": "set status to active",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -294,7 +389,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -302,9 +397,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-190b-76f8-8f41-6b2d9f33d623",
+                            "uuid": "01969b47-2c93-76f8-8f41-6b2d9f33d623",
                             "type": "contact_status_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:30:56.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "status": "active"
                         }
                     ]
@@ -315,14 +414,30 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'A'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-2c93-76f8-8f41-6b2d9f33d623",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "status": "active",
+                    "type": "contact_status_changed"
+                }
             }
         ]
     },
     {
         "label": "set text field with valid value",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -345,7 +460,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -358,9 +473,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-1cf3-76f8-a17e-f85e49829fb9",
+                            "uuid": "01969b47-384b-76f8-a17e-f85e49829fb9",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:30:59.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "gender",
                                 "name": "Gender"
@@ -377,14 +496,37 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{\"3a5891e4-756e-4dc9-8e12-b7a766168824\": {\"text\": \"M\"}}'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-384b-76f8-a17e-f85e49829fb9",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:59Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:59.123456789Z",
+                    "field": {
+                        "key": "gender",
+                        "name": "Gender"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "text": "M"
+                    }
+                }
             }
         ]
     },
     {
         "label": "set numeric field with valid value",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -407,7 +549,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -430,9 +572,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-20db-76f8-ba00-bd7f0d08e671",
+                            "uuid": "01969b47-4403-76f8-ba00-bd7f0d08e671",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:31:02.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "age",
                                 "name": "Age"
@@ -443,9 +589,9 @@
                             }
                         },
                         {
-                            "uuid": "01969b47-24c3-76f8-b86e-4b881f09a186",
+                            "uuid": "01969b47-4bd3-76f8-b86e-4b881f09a186",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:02.123456789Z",
+                            "created_on": "2025-05-04T12:31:04.123456789Z",
                             "groups_added": [
                                 {
                                     "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
@@ -461,22 +607,62 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{\"3a5891e4-756e-4dc9-8e12-b7a766168824\": {\"text\": \"M\"}, \"903f51da-2717-47c7-a0d3-f2f32877013d\": {\"text\": \"24\", \"number\": 24}}'",
-                "count": 1
+                "returns": 1
             },
             {
                 "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
-                "count": 1
+                "returns": 1
             },
             {
                 "query": "SELECT count(*) FROM contacts_contactfire WHERE contact_id = 10000 AND fire_type = 'C'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-4403-76f8-ba00-bd7f0d08e671",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:02Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:02.123456789Z",
+                    "field": {
+                        "key": "age",
+                        "name": "Age"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "number": 24,
+                        "text": "24"
+                    }
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-4bd3-76f8-b86e-4b881f09a186",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:04Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:04.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
             }
         ]
     },
     {
         "label": "set date field with valid value",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -499,7 +685,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -520,34 +706,62 @@
                             },
                             "joined": {
                                 "text": "26/06/2020",
-                                "datetime": "2020-06-26T05:30:01.123456-07:00"
+                                "datetime": "2020-06-26T05:31:06.123456-07:00"
                             }
                         }
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-28ab-76f8-a691-235cbe720980",
+                            "uuid": "01969b47-5b73-76f8-a691-235cbe720980",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:02.123456789Z",
+                            "created_on": "2025-05-04T12:31:08.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "joined",
                                 "name": "Joined"
                             },
                             "value": {
                                 "text": "26/06/2020",
-                                "datetime": "2020-06-26T05:30:01.123456-07:00"
+                                "datetime": "2020-06-26T05:31:06.123456-07:00"
                             }
                         }
                     ]
                 }
             },
             "skipped": []
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-5b73-76f8-a691-235cbe720980",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:08Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:08.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "datetime": "2020-06-26T05:31:06.123456-07:00",
+                        "text": "26/06/2020"
+                    }
+                }
+            }
+        ]
     },
     {
         "label": "set state field with valid value",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -570,7 +784,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -591,7 +805,7 @@
                             },
                             "joined": {
                                 "text": "26/06/2020",
-                                "datetime": "2020-06-26T05:30:01.123456-07:00"
+                                "datetime": "2020-06-26T05:31:06.123456-07:00"
                             },
                             "state": {
                                 "text": "BORNO",
@@ -601,9 +815,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-2c93-76f8-bebe-b4a1f677cf4c",
+                            "uuid": "01969b47-672b-76f8-bebe-b4a1f677cf4c",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:31:11.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "state",
                                 "name": "State"
@@ -617,12 +835,36 @@
                 }
             },
             "skipped": []
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-672b-76f8-bebe-b4a1f677cf4c",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:11Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:11.123456789Z",
+                    "field": {
+                        "key": "state",
+                        "name": "State"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "state": "Nigeria \u003e Borno",
+                        "text": "BORNO"
+                    }
+                }
+            }
+        ]
     },
     {
         "label": "clear fields",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -669,7 +911,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -677,9 +919,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-307b-76f8-8dbf-00ecf5d03034",
+                            "uuid": "01969b47-6efb-76f8-8dbf-00ecf5d03034",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:13.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "gender",
                                 "name": "Gender"
@@ -687,9 +933,13 @@
                             "value": null
                         },
                         {
-                            "uuid": "01969b47-3463-76f8-acca-bbca70987315",
+                            "uuid": "01969b47-76cb-76f8-acca-bbca70987315",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:31:15.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "age",
                                 "name": "Age"
@@ -697,9 +947,9 @@
                             "value": null
                         },
                         {
-                            "uuid": "01969b47-384b-76f8-afcb-91a2073e5459",
+                            "uuid": "01969b47-7e9b-76f8-afcb-91a2073e5459",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:02.123456789Z",
+                            "created_on": "2025-05-04T12:31:17.123456789Z",
                             "groups_removed": [
                                 {
                                     "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
@@ -708,9 +958,13 @@
                             ]
                         },
                         {
-                            "uuid": "01969b47-3c33-76f8-9654-8a7258fbaae4",
+                            "uuid": "01969b47-866b-76f8-9654-8a7258fbaae4",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:03.123456789Z",
+                            "created_on": "2025-05-04T12:31:19.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "joined",
                                 "name": "Joined"
@@ -718,9 +972,13 @@
                             "value": null
                         },
                         {
-                            "uuid": "01969b47-401b-76f8-8e78-3bde7b3370ae",
+                            "uuid": "01969b47-8e3b-76f8-8e78-3bde7b3370ae",
                             "type": "contact_field_changed",
-                            "created_on": "2018-07-06T12:30:04.123456789Z",
+                            "created_on": "2025-05-04T12:31:21.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "field": {
                                 "key": "state",
                                 "name": "State"
@@ -735,22 +993,116 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND fields = '{}'",
-                "count": 1
+                "returns": 1
             },
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
-                "count": 0
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10005",
+                "returns": 0
             },
             {
                 "query": "SELECT count(*) FROM contacts_contactfire WHERE contact_id = 10000 AND fire_type = 'C'",
-                "count": 0
+                "returns": 0
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-6efb-76f8-8dbf-00ecf5d03034",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:13Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:13.123456789Z",
+                    "field": {
+                        "key": "gender",
+                        "name": "Gender"
+                    },
+                    "type": "contact_field_changed",
+                    "value": null
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-76cb-76f8-acca-bbca70987315",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:15Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:15.123456789Z",
+                    "field": {
+                        "key": "age",
+                        "name": "Age"
+                    },
+                    "type": "contact_field_changed",
+                    "value": null
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-7e9b-76f8-afcb-91a2073e5459",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:17Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:17.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-866b-76f8-9654-8a7258fbaae4",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:19Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:19.123456789Z",
+                    "field": {
+                        "key": "joined",
+                        "name": "Joined"
+                    },
+                    "type": "contact_field_changed",
+                    "value": null
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-8e3b-76f8-8e78-3bde7b3370ae",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:21Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:21.123456789Z",
+                    "field": {
+                        "key": "state",
+                        "name": "State"
+                    },
+                    "type": "contact_field_changed",
+                    "value": null
+                }
             }
         ]
     },
     {
         "label": "add group",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -775,7 +1127,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -789,9 +1141,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-4403-76f8-b62c-3c781ca3b5da",
+                            "uuid": "01969b47-960b-76f8-b62c-3c781ca3b5da",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:23.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "groups_added": [
                                 {
                                     "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
@@ -806,15 +1162,37 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
-                "count": 1
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10006",
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-960b-76f8-b62c-3c781ca3b5da",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:23Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:23.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
             }
         ]
     },
     {
         "label": "add group contact already in",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -839,7 +1217,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -858,15 +1236,15 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
-                "count": 1
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10006",
+                "returns": 1
             }
         ]
     },
     {
         "label": "remove group",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -891,7 +1269,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -899,9 +1277,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-47eb-76f8-af9c-ff2f1faac4db",
+                            "uuid": "01969b47-9ddb-76f8-af9c-ff2f1faac4db",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:25.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "groups_removed": [
                                 {
                                     "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
@@ -916,15 +1298,37 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10001",
-                "count": 0
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10006",
+                "returns": 0
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-9ddb-76f8-af9c-ff2f1faac4db",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:25Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:25.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
             }
         ]
     },
     {
         "label": "remove group contact isn't part of",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -949,7 +1353,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "status": "active",
                         "timezone": "America/Los_Angeles",
@@ -962,15 +1366,15 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10000",
-                "count": 0
+                "query": "SELECT count(*) FROM contacts_contactgroup_contacts WHERE contact_id = 10000 AND contactgroup_id = 10005",
+                "returns": 0
             }
         ]
     },
     {
         "label": "set contact language",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -989,7 +1393,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
@@ -998,9 +1402,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-4bd3-76f8-8d9f-e51d30290005",
+                            "uuid": "01969b47-a5ab-76f8-8d9f-e51d30290005",
                             "type": "contact_language_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:27.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "language": "fra"
                         }
                     ]
@@ -1011,14 +1419,31 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contact WHERE language = 'fra' and id = 10000",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-a5ab-76f8-8d9f-e51d30290005",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:27Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:27.123456789Z",
+                    "language": "fra",
+                    "type": "contact_language_changed"
+                }
             }
         ]
     },
     {
         "label": "add URN",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1040,7 +1465,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
@@ -1052,9 +1477,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-4fbb-76f8-bec9-e032f4f9af5f",
+                            "uuid": "01969b47-ad7b-76f8-bec9-e032f4f9af5f",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:29.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": [
                                 "tel:+255788555111"
                             ]
@@ -1067,14 +1496,33 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-ad7b-76f8-bec9-e032f4f9af5f",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:29Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:29.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
             }
         ]
     },
     {
         "label": "add an invalid URN",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1096,21 +1544,21 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000"
+                            "tel:+255788555111"
                         ]
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-53a3-76f8-9853-0310d032b497",
+                            "uuid": "01969b47-b54b-76f8-9853-0310d032b497",
                             "type": "error",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:31.123456789Z",
                             "text": "'xyz:12345' is not valid URN"
                         }
                     ]
@@ -1121,14 +1569,14 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE identity = 'xyz:12345'",
-                "count": 0
+                "returns": 0
             }
         ]
     },
     {
         "label": "add URNs, one of which already exists",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1151,24 +1599,28 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000",
+                            "tel:+255788555111",
                             "tel:+255788555222"
                         ]
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-578b-76f8-8ab7-4a517a86045c",
+                            "uuid": "01969b47-bd1b-76f8-8ab7-4a517a86045c",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:33.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": [
-                                "tel:+255788555111?id=30000",
+                                "tel:+255788555111",
                                 "tel:+255788555222"
                             ]
                         }
@@ -1180,14 +1632,34 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-bd1b-76f8-8ab7-4a517a86045c",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:33Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:33.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555222"
+                    ]
+                }
             }
         ]
     },
     {
         "label": "remove a URN",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1209,23 +1681,27 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000"
+                            "tel:+255788555111"
                         ]
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-5b73-76f8-97a3-ae27459a6be4",
+                            "uuid": "01969b47-c4eb-76f8-97a3-ae27459a6be4",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:35.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": [
-                                "tel:+255788555111?id=30000"
+                                "tel:+255788555111"
                             ]
                         }
                     ]
@@ -1236,18 +1712,37 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
-                "count": 1
+                "returns": 1
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
-                "count": 0
+                "returns": 0
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-c4eb-76f8-97a3-ae27459a6be4",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:35Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:35.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
             }
         ]
     },
     {
         "label": "set URNs",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1270,7 +1765,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
@@ -1283,9 +1778,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-5f5b-76f8-ba82-c15b24dd577f",
+                            "uuid": "01969b47-ccbb-76f8-ba82-c15b24dd577f",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:37.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": [
                                 "tel:+255788555111",
                                 "tel:+255788555333"
@@ -1299,26 +1798,46 @@
         "db_assertions": [
             {
                 "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
-                "count": 3
+                "returns": 3
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
-                "count": 1
+                "returns": 1
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
-                "count": 0
+                "returns": 0
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
-                "count": 1
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-ccbb-76f8-ba82-c15b24dd577f",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:37Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:37.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+255788555111",
+                        "tel:+255788555333"
+                    ]
+                }
             }
         ]
     },
     {
         "label": "clear URNs",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1338,7 +1857,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
@@ -1347,9 +1866,13 @@
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-6343-76f8-ba7e-53c2263e32f8",
+                            "uuid": "01969b47-d48b-76f8-ba7e-53c2263e32f8",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:39.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": []
                         }
                     ]
@@ -1360,26 +1883,43 @@
         "db_assertions": [
             {
                 "query": "SELECT count(DISTINCT path) FROM contacts_contacturn WHERE path IN ('+255788555111', '+255788555222', '+255788555333')",
-                "count": 3
+                "returns": 3
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555111'",
-                "count": 0
+                "returns": 0
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555222'",
-                "count": 0
+                "returns": 0
             },
             {
                 "query": "SELECT count(*) FROM contacts_contacturn WHERE contact_id = 10000 AND path = '+255788555333'",
-                "count": 0
+                "returns": 0
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-d48b-76f8-ba7e-53c2263e32f8",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:39Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:39.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": []
+                }
             }
         ]
     },
     {
         "label": "open ticket",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1393,11 +1933,11 @@
                         "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
                         "name": "Support"
                     },
-                    "note": "Need help",
                     "assignee": {
                         "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
                         "name": "Andy Admin"
-                    }
+                    },
+                    "note": "Need help"
                 }
             ]
         },
@@ -1406,7 +1946,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "language": "fra",
                         "status": "active",
@@ -1418,25 +1958,10 @@
                                 "name": "Open Tickets"
                             }
                         ],
-                        "ticket": {
-                            "uuid": "01969b47-672b-76f8-aaa3-04d3fbce5f9a",
-                            "topic": {
-                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
-                                "name": "Support"
-                            },
-                            "assignee": {
-                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
-                                "name": "Andy Admin"
-                            }
-                        }
-                    },
-                    "events": [
-                        {
-                            "uuid": "01969b47-6b13-76f8-a13f-9238de2a0b76",
-                            "type": "ticket_opened",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
-                            "ticket": {
-                                "uuid": "01969b47-672b-76f8-aaa3-04d3fbce5f9a",
+                        "tickets": [
+                            {
+                                "uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
+                                "status": "open",
                                 "topic": {
                                     "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
                                     "name": "Support"
@@ -1445,13 +1970,46 @@
                                     "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
                                     "name": "Andy Admin"
                                 }
+                            }
+                        ]
+                    },
+                    "events": [
+                        {
+                            "uuid": "01969b47-e043-76f8-a13f-9238de2a0b76",
+                            "type": "ticket_opened",
+                            "created_on": "2025-05-04T12:31:42.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
                             },
+                            "ticket": {
+                                "uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
+                                "status": "open",
+                                "topic": {
+                                    "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
+                                    "name": "Support"
+                                },
+                                "assignee": {
+                                    "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                    "name": "Andy Admin"
+                                }
+                            }
+                        },
+                        {
+                            "uuid": "01969b47-e813-76f8-9014-2c868db4022e",
+                            "type": "ticket_note_added",
+                            "created_on": "2025-05-04T12:31:44.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
+                            "ticket_uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
                             "note": "Need help"
                         },
                         {
-                            "uuid": "01969b47-6efb-76f8-9014-2c868db4022e",
+                            "uuid": "01969b47-efe3-76f8-bef6-3979f99a96f9",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:31:46.123456789Z",
                             "groups_added": [
                                 {
                                     "uuid": "361838c4-2866-495a-8990-9f3c222a7604",
@@ -1463,12 +2021,70 @@
                 }
             },
             "skipped": []
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-e043-76f8-a13f-9238de2a0b76",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:42.123456789Z",
+                    "ticket": {
+                        "assignee": {
+                            "name": "Andy Admin",
+                            "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                        },
+                        "status": "open",
+                        "topic": {
+                            "name": "Support",
+                            "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0"
+                        },
+                        "uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a"
+                    },
+                    "type": "ticket_opened"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-e813-76f8-9014-2c868db4022e",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:44.123456789Z",
+                    "note": "Need help",
+                    "ticket_uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
+                    "type": "ticket_note_added"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-efe3-76f8-bef6-3979f99a96f9",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:46Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:31:46.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Open Tickets",
+                            "uuid": "361838c4-2866-495a-8990-9f3c222a7604"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            }
+        ]
     },
     {
         "label": "multiple modifiers of different types",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1508,7 +2124,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "name": "Juan",
                         "language": "spa",
@@ -1528,35 +2144,50 @@
                                 "name": "Testers"
                             }
                         ],
-                        "ticket": {
-                            "uuid": "01969b47-672b-76f8-aaa3-04d3fbce5f9a",
-                            "topic": {
-                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
-                                "name": "Support"
-                            },
-                            "assignee": {
-                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
-                                "name": "Andy Admin"
+                        "tickets": [
+                            {
+                                "uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
+                                "status": "open",
+                                "topic": {
+                                    "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
+                                    "name": "Support"
+                                },
+                                "assignee": {
+                                    "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                    "name": "Andy Admin"
+                                }
                             }
-                        }
+                        ]
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-72e3-76f8-bef6-3979f99a96f9",
+                            "uuid": "01969b47-ff83-76f8-ba91-c48ad8c50e6b",
                             "type": "contact_name_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:50.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "name": "Juan"
                         },
                         {
-                            "uuid": "01969b47-76cb-76f8-ba91-c48ad8c50e6b",
+                            "uuid": "01969b48-0753-76f8-be24-6164105d48f2",
                             "type": "contact_language_changed",
-                            "created_on": "2018-07-06T12:30:01.123456789Z",
+                            "created_on": "2025-05-04T12:31:52.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "language": "spa"
                         },
                         {
-                            "uuid": "01969b47-7ab3-76f8-be24-6164105d48f2",
+                            "uuid": "01969b48-0f23-76f8-8768-7d0ba4d4f3e8",
                             "type": "contact_groups_changed",
-                            "created_on": "2018-07-06T12:30:02.123456789Z",
+                            "created_on": "2025-05-04T12:31:54.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "groups_added": [
                                 {
                                     "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d",
@@ -1565,9 +2196,13 @@
                             ]
                         },
                         {
-                            "uuid": "01969b47-7e9b-76f8-8768-7d0ba4d4f3e8",
+                            "uuid": "01969b48-16f3-76f8-b63d-c8dcc2fa9de0",
                             "type": "contact_urns_changed",
-                            "created_on": "2018-07-06T12:30:03.123456789Z",
+                            "created_on": "2025-05-04T12:31:56.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "urns": [
                                 "tel:+255788555111"
                             ]
@@ -1576,12 +2211,81 @@
                 }
             },
             "skipped": []
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-ff83-76f8-ba91-c48ad8c50e6b",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:50Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:50.123456789Z",
+                    "name": "Juan",
+                    "type": "contact_name_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-0753-76f8-be24-6164105d48f2",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:52Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:52.123456789Z",
+                    "language": "spa",
+                    "type": "contact_language_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-0f23-76f8-8768-7d0ba4d4f3e8",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:54Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:54.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Testers",
+                            "uuid": "5e9d8fab-5e7e-4f51-b533-261af5dea70d"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-16f3-76f8-b63d-c8dcc2fa9de0",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:56Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:56.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+255788555111"
+                    ]
+                }
+            }
+        ]
     },
     {
         "label": "locked contacts are skipped",
         "method": "POST",
-        "path": "/mr/contact/modify",
+        "path": "/mi/contact/modify",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -1601,7 +2305,7 @@
             "modified": {
                 "10000": {
                     "contact": {
-                        "uuid": "6393abc0-283d-4c9b-a1b3-641a035c34bf",
+                        "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf",
                         "id": 10000,
                         "name": "Juan",
                         "language": "eng",
@@ -1609,7 +2313,7 @@
                         "timezone": "America/Los_Angeles",
                         "created_on": "2018-07-06T12:30:00.123457Z",
                         "urns": [
-                            "tel:+255788555111?id=30000"
+                            "tel:+255788555111"
                         ],
                         "groups": [
                             {
@@ -1621,23 +2325,30 @@
                                 "name": "Testers"
                             }
                         ],
-                        "ticket": {
-                            "uuid": "01969b47-672b-76f8-aaa3-04d3fbce5f9a",
-                            "topic": {
-                                "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
-                                "name": "Support"
-                            },
-                            "assignee": {
-                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
-                                "name": "Andy Admin"
+                        "tickets": [
+                            {
+                                "uuid": "01969b47-dc5b-76f8-aaa3-04d3fbce5f9a",
+                                "status": "open",
+                                "topic": {
+                                    "uuid": "0a8f2e00-fef6-402c-bd79-d789446ec0e0",
+                                    "name": "Support"
+                                },
+                                "assignee": {
+                                    "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                    "name": "Andy Admin"
+                                }
                             }
-                        }
+                        ]
                     },
                     "events": [
                         {
-                            "uuid": "01969b47-8283-76f8-b63d-c8dcc2fa9de0",
+                            "uuid": "01969b48-1ec3-76f8-8f9d-465efd6fbb5e",
                             "type": "contact_language_changed",
-                            "created_on": "2018-07-06T12:30:00.123456789Z",
+                            "created_on": "2025-05-04T12:31:58.123456789Z",
+                            "_user": {
+                                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                                "name": "Andy Admin"
+                            },
                             "language": "eng"
                         }
                     ]
@@ -1646,6 +2357,23 @@
             "skipped": [
                 10003
             ]
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-1ec3-76f8-8f9d-465efd6fbb5e",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:31:58Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:31:58.123456789Z",
+                    "language": "eng",
+                    "type": "contact_language_changed"
+                }
+            }
+        ]
     }
 ]

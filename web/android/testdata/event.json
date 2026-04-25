@@ -2,7 +2,7 @@
     {
         "label": "illegal method",
         "method": "GET",
-        "path": "/mr/android/event",
+        "path": "/mi/android/event",
         "status": 405,
         "response": {
             "error": "illegal method: GET"
@@ -11,7 +11,7 @@
     {
         "label": "invalid org_id",
         "method": "POST",
-        "path": "/mr/android/event",
+        "path": "/mi/android/event",
         "body": {
             "org_id": 1234,
             "channel_id": 12,
@@ -22,13 +22,13 @@
         },
         "status": 500,
         "response": {
-            "error": "unable to load org assets: error loading environment for org 1234: no org with id: 1234"
+            "error": "error loading org assets: error loading environment for org 1234: no org with id: 1234"
         }
     },
     {
         "label": "event created in database",
         "method": "POST",
-        "path": "/mr/android/event",
+        "path": "/mi/android/event",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -39,19 +39,19 @@
         },
         "status": 200,
         "response": {
-            "id": 1
+            "id": 30000
         },
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM channels_channelevent WHERE event_type = 'mo_call' AND contact_id = 10000 AND status = 'H'",
-                "count": 1
+                "returns": 1
             }
         ]
     },
     {
         "label": "event created in database and queued for handling",
         "method": "POST",
-        "path": "/mr/android/event",
+        "path": "/mi/android/event",
         "body": {
             "org_id": 1,
             "channel_id": 10000,
@@ -62,13 +62,23 @@
         },
         "status": 200,
         "response": {
-            "id": 2
+            "id": 30001
         },
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM channels_channelevent WHERE event_type = 'mo_miss' AND contact_id = 10000 AND status = 'P'",
-                "count": 1
+                "returns": 1
             }
-        ]
+        ],
+        "expected_tasks": {
+            "realtime/1": [
+                {
+                    "type": "handle_contact_event",
+                    "payload": {
+                        "contact_id": 10000
+                    }
+                }
+            ]
+        }
     }
 ]

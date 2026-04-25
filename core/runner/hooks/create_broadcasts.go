@@ -17,15 +17,12 @@ var CreateBroadcasts runner.PostCommitHook = &createBroadcasts{}
 
 type createBroadcasts struct{}
 
-func (h *createBroadcasts) Order() int { return 1 }
+func (h *createBroadcasts) Order() int { return 10 }
 
 func (h *createBroadcasts) Execute(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
-	rc := rt.VK.Get()
-	defer rc.Close()
-
 	// for each of our scene
-	for _, es := range scenes {
-		for _, e := range es {
+	for _, args := range scenes {
+		for _, e := range args {
 			event := e.(*events.BroadcastCreated)
 
 			// create a non-persistent broadcast
@@ -34,7 +31,7 @@ func (h *createBroadcasts) Execute(ctx context.Context, rt *runtime.Runtime, oa 
 				return fmt.Errorf("error creating broadcast: %w", err)
 			}
 
-			err = tasks.Queue(rc, tasks.BatchQueue, oa.OrgID(), &msgs.SendBroadcastTask{Broadcast: bcast}, false)
+			err = tasks.Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), &msgs.SendBroadcastTask{Broadcast: bcast}, false)
 			if err != nil {
 				return fmt.Errorf("error queuing broadcast task: %w", err)
 			}

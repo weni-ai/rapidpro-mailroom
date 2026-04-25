@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
 // UpdateCallStatus is our hook for updating IVR call status
@@ -16,11 +16,11 @@ var UpdateCallStatus runner.PreCommitHook = &updateCallStatus{}
 
 type updateCallStatus struct{}
 
-func (h *updateCallStatus) Order() int { return 1 }
+func (h *updateCallStatus) Order() int { return 10 }
 
 func (h *updateCallStatus) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
-	for scene, es := range scenes {
-		status := es[len(es)-1].(models.CallStatus)
+	for scene, args := range scenes {
+		status := args[len(args)-1].(models.CallStatus)
 
 		if status == models.CallStatusInProgress {
 			session := scene.Session

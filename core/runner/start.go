@@ -23,18 +23,14 @@ type TriggerBuilder func() flows.Trigger
 
 // StartWithLock starts the given contacts in flow sessions after obtaining locks for them.
 func StartWithLock(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contactIDs []models.ContactID, triggerBuilder TriggerBuilder, interrupt bool, startID models.StartID) ([]*Scene, error) {
-	if len(contactIDs) == 0 {
-		return nil, nil
-	}
-
 	// we now need to grab locks for our contacts so that they are never in two starts or handles at the
-	// same time we try to grab locks for up to five minutes, but do it in batches where we wait for one
+	// same time we try to grab locks for up to a minute, but do it in batches where we wait for one
 	// second per contact to prevent deadlocks
 	scenes := make([]*Scene, 0, len(contactIDs))
 	remaining := contactIDs
 	start := time.Now()
 
-	for len(remaining) > 0 && time.Since(start) < time.Minute*5 {
+	for len(remaining) > 0 && time.Since(start) < time.Minute {
 		if ctx.Err() != nil {
 			return scenes, ctx.Err()
 		}
@@ -68,29 +64,28 @@ func tryToStartWithLock(ctx context.Context, rt *runtime.Runtime, oa *models.Org
 	// whatever happens, we need to unlock the contacts
 	defer clocks.Unlock(ctx, rt, oa, locks)
 
-	// load our locked contacts
-	mcs, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, locked)
+	// create scenes for the locked contacts
+	scenes, err := CreateScenes(ctx, rt, oa, locked, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error loading contacts to start: %w", err)
+		return nil, nil, fmt.Errorf("error creating scenes for bulk start: %w", err)
 	}
 
-	scenes := make([]*Scene, 0, len(mcs))
+	if interrupt {
+		if err := addInterruptEvents(ctx, rt, oa, scenes, flows.SessionStatusInterrupted); err != nil {
+			return nil, nil, fmt.Errorf("error interrupting existing sessions: %w", err)
+		}
+	}
 
-	for _, mc := range mcs {
-		c, err := mc.EngineContact(oa)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error creating flow contact: %w", err)
+	for _, scene := range scenes {
+		if ctx.Err() != nil {
+			return nil, nil, fmt.Errorf("error starting session: %w", ctx.Err())
 		}
 
-		scene := NewScene(mc, c)
 		scene.StartID = startID
-		scene.Interrupt = interrupt
 
-		if err := scene.StartSession(ctx, rt, oa, triggerBuilder()); err != nil {
+		if err := scene.StartSession(ctx, rt, oa, triggerBuilder(), false); err != nil {
 			return nil, nil, fmt.Errorf("error starting session for contact %s: %w", scene.ContactUUID(), err)
 		}
-
-		scenes = append(scenes, scene)
 	}
 
 	if err := BulkCommit(ctx, rt, oa, scenes); err != nil {

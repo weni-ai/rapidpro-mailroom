@@ -12,7 +12,6 @@ import (
 	"github.com/nyaruka/mailroom/core/crons"
 	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/core/runner/handlers"
-	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/campaigns"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -22,23 +21,23 @@ import (
 )
 
 func TestFireContacts(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Cathy, models.ContactFireTypeWaitTimeout, "", time.Now().Add(3*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Cathy, models.ContactFireTypeWaitExpiration, "", time.Now().Add(-1*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Cathy, models.ContactFireTypeSessionExpiration, "", time.Now().Add(-2*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Ann, models.ContactFireTypeWaitTimeout, "", time.Now().Add(3*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Ann, models.ContactFireTypeWaitExpiration, "", time.Now().Add(-1*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Ann, models.ContactFireTypeSessionExpiration, "", time.Now().Add(-2*time.Second), "f72b48df-5f6d-4e4f-955a-f5fb29ccb97b")
 
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Bob, models.ContactFireTypeWaitTimeout, "", time.Now().Add(3*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Bob, models.ContactFireTypeWaitExpiration, "", time.Now().Add(-3*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Bob, models.ContactFireTypeSessionExpiration, "", time.Now().Add(10*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Bob, models.ContactFireTypeWaitTimeout, "", time.Now().Add(3*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Bob, models.ContactFireTypeWaitExpiration, "", time.Now().Add(-3*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Bob, models.ContactFireTypeSessionExpiration, "", time.Now().Add(10*time.Second), "4010a3b2-d1f2-42ae-9051-47d41a3ef923")
 
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.George, models.ContactFireTypeWaitTimeout, "", time.Now().Add(-time.Second), "5c1248e3-f669-4a72-83f4-a29292fdad4d")
-	testdb.InsertContactFire(rt, testdb.Org1, testdb.Alexandra, models.ContactFireTypeCampaignPoint, "6789:123", time.Now().Add(-time.Second), "")
-	testdb.InsertContactFire(rt, testdb.Org2, testdb.Org2Contact, models.ContactFireTypeWaitTimeout, "", time.Now().Add(-time.Second), "8edf3b3c-0081-4d31-b199-1502b3190eb7")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Cat, models.ContactFireTypeWaitTimeout, "", time.Now().Add(-time.Second), "5c1248e3-f669-4a72-83f4-a29292fdad4d")
+	testdb.InsertContactFire(t, rt, testdb.Org1, testdb.Dan, models.ContactFireTypeCampaignPoint, "6789:123", time.Now().Add(-time.Second), "")
+	testdb.InsertContactFire(t, rt, testdb.Org2, testdb.Org2Contact, models.ContactFireTypeWaitTimeout, "", time.Now().Add(-time.Second), "8edf3b3c-0081-4d31-b199-1502b3190eb7")
 
 	cron := &crons.FireContactsCron{FetchBatchSize: 3, TaskBatchSize: 5}
 	res, err := cron.Run(ctx, rt)
@@ -48,7 +47,7 @@ func TestFireContacts(t *testing.T) {
 	// should have created 5 throttled tasks.. unfortunately order is not guaranteed so we sort them
 	var ts []*queues.Task
 	for range 5 {
-		task, err := tasks.ThrottledQueue.Pop(rc)
+		task, err := rt.Queues.Throttled.Pop(ctx, vc)
 		assert.NoError(t, err)
 		ts = append(ts, task)
 	}
@@ -70,7 +69,7 @@ func TestFireContacts(t *testing.T) {
 	decoded1 := &campaigns.BulkCampaignTriggerTask{}
 	jsonx.MustUnmarshal(ts[0].Task, decoded1)
 	assert.Len(t, decoded1.ContactIDs, 1)
-	assert.Equal(t, testdb.Alexandra.ID, decoded1.ContactIDs[0])
+	assert.Equal(t, testdb.Dan.ID, decoded1.ContactIDs[0])
 	assert.Equal(t, models.PointID(6789), decoded1.PointID)
 	assert.Equal(t, 123, decoded1.FireVersion)
 

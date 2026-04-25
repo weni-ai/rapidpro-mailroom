@@ -23,7 +23,7 @@ import (
 )
 
 func TestResponseForSprint(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
 	urn := urns.URN("tel:+12067799294")
 	expiresOn := time.Now().Add(time.Hour)
@@ -140,9 +140,9 @@ func TestURNForRequest(t *testing.T) {
 }
 
 func TestRedactValues(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 	ch := oa.ChannelByUUID(testdb.TwilioChannel.UUID)
 	svc, _ := ivr.GetService(ch)
 

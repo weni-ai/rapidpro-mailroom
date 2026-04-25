@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/buger/jsonparser"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
@@ -18,6 +17,7 @@ import (
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/vkutil"
+	"github.com/vinovest/sqlx"
 )
 
 const (
@@ -33,7 +33,7 @@ var InsertFlowStats runner.PreCommitHook = &insertFlowStats{}
 
 type insertFlowStats struct{}
 
-func (h *insertFlowStats) Order() int { return 1 }
+func (h *insertFlowStats) Order() int { return 10 }
 
 func (h *insertFlowStats) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	countsBySegment := make(map[segmentInfo]int, 10)
@@ -41,8 +41,10 @@ func (h *insertFlowStats) Execute(ctx context.Context, rt *runtime.Runtime, tx *
 	categoryChanges := make(map[resultInfo]int, 10)
 	nodeTypeCache := make(map[flows.NodeUUID]string)
 
-	// scenes are processed in order of session UUID.. solely for the sake of test determinism
-	for _, scene := range slices.SortedStableFunc(maps.Keys(scenes), func(s1, s2 *runner.Scene) int { return cmp.Compare(s1.SessionUUID(), s2.SessionUUID()) }) {
+	// for test determinism
+	scenesOrdered := slices.SortedStableFunc(maps.Keys(scenes), func(s1, s2 *runner.Scene) int { return cmp.Compare(s1.SessionUUID(), s2.SessionUUID()) })
+
+	for _, scene := range scenesOrdered {
 		for _, seg := range scene.Sprint.Segments() {
 			segID := segmentInfo{
 				flowID:   seg.Flow().Asset().(*models.Flow).ID(),
@@ -68,7 +70,7 @@ func (h *insertFlowStats) Execute(ctx context.Context, rt *runtime.Runtime, tx *
 		for _, e := range scene.Sprint.Events() {
 			switch typed := e.(type) {
 			case *events.RunResultChanged:
-				flow, _ := scene.LocateEvent(e)
+				flow := e.Step().Run().Flow().Asset().(*models.Flow)
 				resultKey := utils.Snakify(typed.Name)
 				if typed.Previous != nil {
 					categoryChanges[resultInfo{flowID: flow.ID(), result: resultKey, category: typed.Previous.Category}]--
@@ -109,8 +111,8 @@ func (h *insertFlowStats) Execute(ctx context.Context, rt *runtime.Runtime, tx *
 		return fmt.Errorf("error inserting flow result counts: %w", err)
 	}
 
-	rc := rt.VK.Get()
-	defer rc.Close()
+	vc := rt.VK.Get()
+	defer vc.Close()
 
 	for segID, recentContacts := range recentBySegment {
 		recentSet := vkutil.NewCappedZSet(fmt.Sprintf(recentContactsKey, segID.exitUUID, segID.destUUID), recentContactsCap, recentContactsExpire)
@@ -120,7 +122,7 @@ func (h *insertFlowStats) Execute(ctx context.Context, rt *runtime.Runtime, tx *
 			value := fmt.Sprintf("%s|%d|%s", recent.rnd, recent.contact.ID(), stringsx.TruncateEllipsis(recent.operand, 100))
 			score := float64(recent.time.UnixNano()) / float64(1e9) // score is UNIX time as floating point
 
-			err := recentSet.Add(ctx, rc, value, score)
+			err := recentSet.Add(ctx, vc, value, score)
 			if err != nil {
 				return fmt.Errorf("error adding recent contact to set: %w", err)
 			}

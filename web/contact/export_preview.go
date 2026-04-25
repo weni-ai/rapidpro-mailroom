@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/export_preview", web.RequireAuthToken(web.JSONPayload(handleExportPreview)))
+	web.InternalRoute(http.MethodPost, "/contact/export_preview", web.JSONPayload(handleExportPreview))
 }
 
 // Generates a preview of which contacts will be included in an export.
@@ -40,7 +40,7 @@ type previewResponse struct {
 func handleExportPreview(ctx context.Context, rt *runtime.Runtime, r *previewRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	group := oa.GroupByID(r.GroupID)

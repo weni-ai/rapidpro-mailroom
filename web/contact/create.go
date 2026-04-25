@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/contact/create", web.RequireAuthToken(web.JSONPayload(handleCreate)))
+	web.InternalRoute(http.MethodPost, "/contact/create", web.JSONPayload(handleCreate))
 }
 
 // Request to create a new contact.
@@ -39,7 +39,7 @@ type createRequest struct {
 func handleCreate(ctx context.Context, rt *runtime.Runtime, r *createRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	c, err := SpecToCreation(r.Contact, oa.Env(), oa.SessionAssets())
@@ -47,13 +47,13 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *createRequest) (a
 		return err, http.StatusBadRequest, nil
 	}
 
-	_, contact, err := models.CreateContact(ctx, rt.DB, oa, r.UserID, c.Name, c.Language, c.Status, c.URNs)
+	mc, contact, err := models.CreateContact(ctx, rt.DB, oa, r.UserID, c.Name, c.Language, c.Status, c.URNs)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	modifiersByContact := map[*flows.Contact][]flows.Modifier{contact: c.Mods}
-	_, err = runner.ApplyModifiers(ctx, rt, oa, r.UserID, modifiersByContact)
+	modifiers := map[flows.ContactUUID][]flows.Modifier{contact.UUID(): c.Mods}
+	_, err = runner.BulkModify(ctx, rt, oa, r.UserID, []*models.Contact{mc}, []*flows.Contact{contact}, modifiers)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error modifying new contact: %w", err)
 	}

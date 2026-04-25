@@ -1,8 +1,10 @@
 package testsuite
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -19,21 +21,21 @@ import (
 )
 
 // AssertCourierQueues asserts the sizes of message batches in the named courier queues
-func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...any) {
-	rc := getRC()
-	defer rc.Close()
+func AssertCourierQueues(t *testing.T, rt *runtime.Runtime, expected map[string][]int, errMsg ...any) {
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	queueKeys, err := redis.Strings(rc.Do("KEYS", "msgs:????????-*"))
+	queueKeys, err := redis.Strings(vc.Do("KEYS", "msgs:????????-*"))
 	require.NoError(t, err)
 
 	actual := make(map[string][]int, len(queueKeys))
 	for _, queueKey := range queueKeys {
-		size, err := redis.Int64(rc.Do("ZCARD", queueKey))
+		size, err := redis.Int64(vc.Do("ZCARD", queueKey))
 		require.NoError(t, err)
 		actual[queueKey] = make([]int, size)
 
 		if size > 0 {
-			results, err := redis.Values(rc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
+			results, err := redis.Values(vc.Do("ZRANGE", queueKey, 0, -1, "WITHSCORES"))
 			require.NoError(t, err)
 			require.Equal(t, int(size*2), len(results)) // result is (item, score, item, score, ...)
 
@@ -53,11 +55,11 @@ func AssertCourierQueues(t *testing.T, expected map[string][]int, errMsg ...any)
 }
 
 // AssertContactTasks asserts that the given contact has the given tasks queued for them
-func AssertContactTasks(t *testing.T, org *testdb.Org, contact *testdb.Contact, expected []string, msgAndArgs ...any) {
-	rc := getRC()
-	defer rc.Close()
+func AssertContactTasks(t *testing.T, rt *runtime.Runtime, org *testdb.Org, contact *testdb.Contact, expected []string, msgAndArgs ...any) {
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	tasks, err := redis.Strings(rc.Do("LRANGE", fmt.Sprintf("c:%d:%d", org.ID, contact.ID), 0, -1))
+	tasks, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("c:%d:%d", org.ID, contact.ID), 0, -1))
 	require.NoError(t, err)
 
 	expectedJSON := jsonx.MustMarshal(expected)
@@ -67,17 +69,22 @@ func AssertContactTasks(t *testing.T, org *testdb.Org, contact *testdb.Contact, 
 }
 
 // AssertBatchTasks asserts that the given org has the given batch tasks queued for them
-func AssertBatchTasks(t *testing.T, orgID models.OrgID, expected map[string]int, msgAndArgs ...any) {
-	rc := getRC()
-	defer rc.Close()
+func AssertBatchTasks(t *testing.T, rt *runtime.Runtime, orgID models.OrgID, expected map[string]int, msgAndArgs ...any) {
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	tasks, err := redis.Strings(rc.Do("ZRANGE", fmt.Sprintf("tasks:batch:%d", orgID), 0, -1))
+	tasks0, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/0", orgID), 0, -1))
+	require.NoError(t, err)
+
+	tasks1, err := redis.Strings(vc.Do("LRANGE", fmt.Sprintf("{tasks:batch}:o:%d/1", orgID), 0, -1))
 	require.NoError(t, err)
 
 	actual := make(map[string]int, 5)
-	for _, taskJSON := range tasks {
+	for _, rawTask := range slices.Concat(tasks0, tasks1) {
+		parts := bytes.SplitN([]byte(rawTask), []byte("|"), 2) // split into id and task json
+
 		task := &queues.Task{}
-		jsonx.MustUnmarshal(json.RawMessage(taskJSON), task)
+		jsonx.MustUnmarshal(parts[1], task)
 
 		actual[task.Type] += 1
 	}
@@ -87,10 +94,10 @@ func AssertBatchTasks(t *testing.T, orgID models.OrgID, expected map[string]int,
 
 func AssertContactInFlow(t *testing.T, rt *runtime.Runtime, contact *testdb.Contact, flow *testdb.Flow) {
 	// check contact has a single waiting session
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, contact.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE contact_uuid = $1 AND status = 'W'`, contact.UUID).Returns(1)
 
 	// check flow of the waiting session and contact is correct
-	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM flows_flowsession WHERE contact_id = $1 AND status = 'W'`, contact.ID).Returns(int64(flow.ID))
+	assertdb.Query(t, rt.DB, `SELECT current_flow_uuid::text FROM flows_flowsession WHERE contact_uuid = $1 AND status = 'W'`, contact.UUID).Returns(string(flow.UUID))
 	assertdb.Query(t, rt.DB, `SELECT current_flow_id FROM contacts_contact WHERE id = $1`, contact.ID).Returns(int64(flow.ID))
 }
 

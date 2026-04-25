@@ -2,7 +2,7 @@
     {
         "label": "error if contact not provided",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3
@@ -13,15 +13,15 @@
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 3",
-                "count": 0
+                "query": "SELECT count(*) FROM contacts_contact WHERE created_by_id != 2",
+                "returns": 0
             }
         ]
     },
     {
         "label": "create empty contact",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 1,
@@ -34,20 +34,20 @@
                 "id": 30000,
                 "status": "active",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T12:30:00.123457Z"
+                "created_on": "2025-05-04T12:30:45.123457Z"
             }
         },
         "db_assertions": [
             {
-                "query": "SELECT count(*) FROM contacts_contact WHERE name IS NULL AND language IS NULL AND created_by_id != 3",
-                "count": 1
+                "query": "SELECT count(*) FROM contacts_contact WHERE name IS NULL AND language IS NULL AND created_by_id != 2",
+                "returns": 1
             }
         ]
     },
     {
         "label": "create contact with all properties",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -75,9 +75,9 @@
                 "language": "spa",
                 "status": "active",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T12:30:00.123457Z",
+                "created_on": "2025-05-04T12:30:46.123457Z",
                 "urns": [
-                    "tel:+16055700001?id=30000"
+                    "tel:+16055700001"
                 ],
                 "groups": [
                     {
@@ -95,12 +95,77 @@
                     }
                 }
             }
-        }
+        },
+        "expected_history": [
+            {
+                "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
+                "SK": "evt#01969b47-113b-76f8-9c0b-2014ddc77094",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:49Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:49.123456789Z",
+                    "field": {
+                        "key": "age",
+                        "name": "Age"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "number": 39,
+                        "text": "39"
+                    }
+                }
+            },
+            {
+                "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
+                "SK": "evt#01969b47-1cf3-76f8-92a3-d648ab64bccb",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:52Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:52.123456789Z",
+                    "field": {
+                        "key": "gender",
+                        "name": "Gender"
+                    },
+                    "type": "contact_field_changed",
+                    "value": {
+                        "text": "M"
+                    }
+                }
+            },
+            {
+                "PK": "con#692926ea-09d6-4942-bd38-d266ec8d3716",
+                "SK": "evt#01969b47-24c3-76f8-8228-9728778b6c98",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:54Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-05-04T12:30:54.123456789Z",
+                    "groups_added": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            }
+        ]
     },
     {
         "label": "error if try to create contact with invalid language",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -117,7 +182,7 @@
     {
         "label": "error if try to create contact with invalid URN",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -141,7 +206,7 @@
     {
         "label": "error if try to create contact with taken URN",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -165,7 +230,7 @@
     {
         "label": "though ok to take an orphaned URN",
         "method": "POST",
-        "path": "/mr/contact/create",
+        "path": "/mi/contact/create",
         "body": {
             "org_id": 1,
             "user_id": 3,
@@ -184,9 +249,9 @@
                 "name": "María",
                 "status": "active",
                 "timezone": "America/Los_Angeles",
-                "created_on": "2018-07-06T12:30:00.123457Z",
+                "created_on": "2025-05-04T12:30:55.123457Z",
                 "urns": [
-                    "tel:+16055741111?id=10000"
+                    "tel:+16055741111"
                 ]
             }
         }

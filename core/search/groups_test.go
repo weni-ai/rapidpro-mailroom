@@ -14,15 +14,15 @@ import (
 )
 
 func TestSmartGroups(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	// insert an event on our campaign
-	newEvent := testdb.InsertCampaignFlowPoint(rt, testdb.RemindersCampaign, testdb.Favorites, testdb.JoinedField, 1000, "W")
+	newEvent := testdb.InsertCampaignFlowPoint(t, rt, testdb.RemindersCampaign, testdb.Favorites, testdb.JoinedField, 1000, "W")
 
-	// clear Cathy's value
-	rt.DB.MustExec(`update contacts_contact set fields = fields - $2 WHERE id = $1`, testdb.Cathy.ID, testdb.JoinedField.UUID)
+	// clear Ann's value
+	rt.DB.MustExec(`update contacts_contact set fields = fields - $2 WHERE id = $1`, testdb.Ann.ID, testdb.JoinedField.UUID)
 
 	// and populate Bob's
 	rt.DB.MustExec(
@@ -30,7 +30,7 @@ func TestSmartGroups(t *testing.T) {
 		testdb.Bob.ID,
 	)
 
-	testsuite.ReindexElastic(ctx)
+	testsuite.ReindexElastic(t, rt)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshCampaigns|models.RefreshGroups)
 	assert.NoError(t, err)
@@ -41,8 +41,8 @@ func TestSmartGroups(t *testing.T) {
 		expectedEventIDs   []models.ContactID
 	}{
 		{ // 0
-			query:              "cathy",
-			expectedContactIDs: []models.ContactID{testdb.Cathy.ID},
+			query:              "ann",
+			expectedContactIDs: []models.ContactID{testdb.Ann.ID},
 			expectedEventIDs:   []models.ContactID{},
 		},
 		{ // 1
@@ -61,7 +61,7 @@ func TestSmartGroups(t *testing.T) {
 		err := models.UpdateGroupStatus(ctx, rt.DB, testdb.DoctorsGroup.ID, models.GroupStatusInitializing)
 		assert.NoError(t, err)
 
-		count, err := search.PopulateSmartGroup(ctx, rt, oa, testdb.DoctorsGroup.ID, tc.query)
+		count, err := search.PopulateGroup(ctx, rt, oa, testdb.DoctorsGroup.ID, tc.query)
 		assert.NoError(t, err, "%d: error populating smart group")
 		assert.Equal(t, count, len(tc.expectedContactIDs), "%d: contact count mismatch", i)
 

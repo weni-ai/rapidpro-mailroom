@@ -6,6 +6,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -14,11 +15,11 @@ import (
 )
 
 func TestInsertAndUpdateRuns(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	sessionUUID := testdb.InsertFlowSession(rt, testdb.Cathy, models.FlowTypeMessaging, models.SessionStatusWaiting, testdb.Favorites, models.NilCallID)
+	sessionUUID := testdb.InsertFlowSession(t, rt, testdb.Ann, models.FlowTypeMessaging, models.SessionStatusWaiting, nil, testdb.Favorites)
 
 	t1 := time.Date(2024, 12, 3, 14, 29, 30, 0, time.UTC)
 	t2 := time.Date(2024, 12, 3, 15, 13, 45, 0, time.UTC)
@@ -34,7 +35,7 @@ func TestInsertAndUpdateRuns(t *testing.T) {
 		PathNodes:       []string{"1895cae0-d3c0-4470-83df-0b4cf9449438", "3ea3c026-e1c0-4950-bb94-d4c532b1459f"},
 		PathTimes:       pq.GenericArray{A: []interface{}{t1, t2}},
 		CurrentNodeUUID: "5f0d8d24-0178-4b10-ae35-b3ccdc785777",
-		ContactID:       testdb.Cathy.ID,
+		ContactID:       testdb.Ann.ID,
 		FlowID:          testdb.Favorites.ID,
 		OrgID:           testdb.Org1.ID,
 		SessionUUID:     sessionUUID,
@@ -77,21 +78,40 @@ func TestInsertAndUpdateRuns(t *testing.T) {
 }
 
 func TestGetContactIDsAtNode(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
 	createRun := func(org *testdb.Org, contact *testdb.Contact, nodeUUID flows.NodeUUID) {
-		sessionUUID := testdb.InsertFlowSession(rt, contact, models.FlowTypeMessaging, models.SessionStatusWaiting, testdb.Favorites, models.NilCallID)
-		testdb.InsertFlowRun(rt, org, sessionUUID, contact, testdb.Favorites, models.RunStatusWaiting, nodeUUID)
+		sessionUUID := testdb.InsertFlowSession(t, rt, contact, models.FlowTypeMessaging, models.SessionStatusWaiting, nil, testdb.Favorites)
+		testdb.InsertFlowRun(t, rt, org, sessionUUID, contact, testdb.Favorites, models.RunStatusWaiting, nodeUUID)
 	}
 
-	createRun(testdb.Org1, testdb.Alexandra, "2fe26b10-2bb1-4115-9401-33a8a0d5d52a")
+	createRun(testdb.Org1, testdb.Dan, "2fe26b10-2bb1-4115-9401-33a8a0d5d52a")
 	createRun(testdb.Org1, testdb.Bob, "dd79811e-a88a-4e67-bb47-a132fe8ce3f2")
-	createRun(testdb.Org1, testdb.George, "dd79811e-a88a-4e67-bb47-a132fe8ce3f2")
+	createRun(testdb.Org1, testdb.Cat, "dd79811e-a88a-4e67-bb47-a132fe8ce3f2")
 	createRun(testdb.Org2, testdb.Org2Contact, "dd79811e-a88a-4e67-bb47-a132fe8ce3f2") // shouldn't be possible but..
 
 	contactIDs, err := models.GetContactIDsAtNode(ctx, rt, testdb.Org1.ID, "dd79811e-a88a-4e67-bb47-a132fe8ce3f2")
 	assert.NoError(t, err)
-	assert.ElementsMatch(t, []models.ContactID{testdb.Bob.ID, testdb.George.ID}, contactIDs)
+	assert.ElementsMatch(t, []models.ContactID{testdb.Bob.ID, testdb.Cat.ID}, contactIDs)
+}
+
+func TestGetActiveAndWaitingRuns(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
+
+	session1UUID := testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Ann, models.FlowTypeMessaging, nil, testdb.Favorites, testdb.PickANumber)
+	session2UUID := testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Bob, models.FlowTypeMessaging, nil, testdb.PickANumber)
+	testdb.InsertFlowSession(t, rt, testdb.Cat, models.FlowTypeMessaging, models.SessionStatusCompleted, nil, testdb.Favorites)
+
+	runRefs, err := models.GetActiveAndWaitingRuns(ctx, rt, []flows.SessionUUID{session1UUID, session2UUID})
+	assert.NoError(t, err)
+
+	assert.Len(t, runRefs[session1UUID], 2)
+	assert.Equal(t, assets.NewFlowReference(testdb.Favorites.UUID, "Favorites"), runRefs[session1UUID][0].Flow)
+	assert.Equal(t, assets.NewFlowReference(testdb.PickANumber.UUID, "Pick a Number"), runRefs[session1UUID][1].Flow)
+	assert.Len(t, runRefs[session2UUID], 1)
+	assert.Equal(t, assets.NewFlowReference(testdb.PickANumber.UUID, "Pick a Number"), runRefs[session2UUID][0].Flow)
 }

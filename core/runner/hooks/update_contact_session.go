@@ -3,11 +3,11 @@ package hooks
 import (
 	"context"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
+	"github.com/vinovest/sqlx"
 )
 
 // UpdateContactSession is our hook for current session changes
@@ -15,13 +15,13 @@ var UpdateContactSession runner.PreCommitHook = &updateContactSession{}
 
 type updateContactSession struct{}
 
-func (h *updateContactSession) Order() int { return 1 }
+func (h *updateContactSession) Order() int { return 10 }
 
 func (h *updateContactSession) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	updates := make([]CurrentSessionUpdate, 0, len(scenes))
-	for _, evts := range scenes {
+	for _, args := range scenes {
 		// there is only ever one of these events per scene
-		update := evts[len(evts)-1].(CurrentSessionUpdate)
+		update := args[len(args)-1].(CurrentSessionUpdate)
 		updates = append(updates, update)
 	}
 
@@ -38,6 +38,6 @@ type CurrentSessionUpdate struct {
 
 const sqlUpdateContactCurrentSession = `
 UPDATE contacts_contact c
-   SET current_session_uuid = r.current_session_uuid::uuid, current_flow_id = r.current_flow_id::int
-  FROM (VALUES(:id, :current_session_uuid, :current_flow_id)) AS r(id, current_session_uuid, current_flow_id)
- WHERE c.id = r.id::int`
+   SET current_session_uuid = r.current_session_uuid, current_flow_id = r.current_flow_id
+  FROM (VALUES(:id::int, :current_session_uuid::uuid, :current_flow_id::int)) AS r(id, current_session_uuid, current_flow_id)
+ WHERE c.id = r.id`

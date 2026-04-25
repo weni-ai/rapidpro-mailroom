@@ -1,0 +1,46 @@
+[
+    {
+        "label": "illegal method",
+        "method": "GET",
+        "path": "/mi/contact/populate_group",
+        "status": 405,
+        "response": {
+            "error": "illegal method: GET"
+        }
+    },
+    {
+        "label": "error if group doesn't exist",
+        "method": "POST",
+        "path": "/mi/contact/populate_group",
+        "body": {
+            "org_id": 1,
+            "group_id": 1234567
+        },
+        "status": 400,
+        "response": {
+            "error": "no such query based group"
+        }
+    },
+    {
+        "label": "response is empty on success",
+        "method": "POST",
+        "path": "/mi/contact/populate_group",
+        "body": {
+            "org_id": 1,
+            "group_id": 30000
+        },
+        "status": 200,
+        "response": {},
+        "expected_tasks": {
+            "batch/1": [
+                {
+                    "type": "populate_dynamic_group",
+                    "payload": {
+                        "group_id": 30000,
+                        "query": "age > 18"
+                    }
+                }
+            ]
+        }
+    }
+]
