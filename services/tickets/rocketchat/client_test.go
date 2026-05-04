@@ -1,11 +1,12 @@
 package rocketchat_test
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/services/tickets/rocketchat"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 const (
@@ -16,7 +17,7 @@ const (
 func TestCreateRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
 			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a department for name: kitchen" }`),
@@ -53,11 +54,11 @@ func TestCreateRoom(t *testing.T) {
 func TestCloseRoom(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room.close": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
-			httpx.NewMockResponse(204, nil, ``),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),
+			httpx.NewMockResponse(204, nil, nil),
 		},
 	}))
 
@@ -78,11 +79,11 @@ func TestCloseRoom(t *testing.T) {
 func TestSendMessage(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/visitor-message": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a room for visitor token: 1234" }`),
-			httpx.NewMockResponse(201, nil, `{ "id": "tyLrD97j8TFZmT3Y6" }`),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a room for visitor token: 1234" }`)),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "tyLrD97j8TFZmT3Y6" }`)),
 		},
 	}))
 

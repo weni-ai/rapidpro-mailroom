@@ -1,11 +1,10 @@
-# Mailroom
+# TextIt Mailroom
 
 [![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
 
-Service for RapidPro/TextIt which does the heavy lifting of running flow starts, campaigns etc.
-flows. It interacts directly with the database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) 
-for handling via Redis.
+Service for TextIt which does the heavy lifting of running flow starts, campaigns etc. It interacts directly with the database 
+and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
 
 ## Deploying
 
@@ -26,7 +25,7 @@ We recommend running it with no changes to the configuration and no parameters, 
 environment variables to configure it. You can use `% mailroom --help` to see a list of the
 environment variables and parameters and for more details on each option.
 
-For use with RapidPro, you will need to configure these settings:
+For use with TextIt, you will need to configure these settings:
 
 - `MAILROOM_ADDRESS`: the address to bind our web server to (default "localhost")
 - `MAILROOM_DOMAIN`: the domain that mailroom is listening on
@@ -35,9 +34,11 @@ For use with RapidPro, you will need to configure these settings:
 - `MAILROOM_DB`: URL describing how to connect to the RapidPro database (default "postgres://temba:temba@localhost/temba?sslmode=disable")
 - `MAILROOM_READONLY_DB`: URL for an additional database connection for read-only operations (optional)
 - `MAILROOM_REDIS`: URL describing how to connect to Redis (default "redis://localhost:6379/15")
-- `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
 - `MAILROOM_SMTP_SERVER`: the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com
 - `MAILROOM_FCM_KEY`: the key for Firebase Cloud Messaging used to sync Android channels
+- `MAILROOM_ELASTIC`: URL describing how to connect to ElasticSearch (default "http://localhost:9200")
+- `MAILROOM_ELASTIC_USERNAME`: ElasticSearch username for Basic Auth
+- `MAILROOM_ELASTIC_PASSWORD`: ElasticSearch password for Basic Auth
 
 For writing of message attachments, you need an S3 compatible service which you configure with:
 
