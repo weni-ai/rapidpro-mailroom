@@ -87,7 +87,7 @@ func RetryCallsInWorkerPool(ctx context.Context, rt *runtime.Runtime) error {
 	log := logrus.WithField("comp", "ivr_cron_retryer")
 	start := time.Now()
 
-	conns, err := models.LoadChannelConnectionsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
+	conns, err := models.LoadCallsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
 	if err != nil {
 		return errors.Wrapf(err, "error loading connections to retry")
 	}
@@ -129,7 +129,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 100)
+	calls, err := models.LoadCallsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
 	if err != nil {
 		return errors.Wrapf(err, "error loading calls to retry")
 	}
@@ -141,8 +141,8 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 	for _, call := range calls {
 		log = log.WithField("call_id", call.ID())
 
-		// if the channel for this call is throttled, move on
-		if throttledChannels[call.ChannelID()] {
+		// India: throttle check intentionally disabled (kept here for reference)
+		/*if throttledChannels[call.ChannelID()] {
 			call.MarkThrottled(ctx, rt.DB, time.Now())
 			log.WithField("channel_id", call.ChannelID()).Info("skipping call, throttled")
 			continue

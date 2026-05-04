@@ -13,9 +13,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Job represents a single retry-call job dispatched to a worker. The Conn
+// field was previously *models.ChannelConnection but upstream renamed
+// ChannelConnection to Call in v8.0.0.
 type Job struct {
 	Id   int
-	Conn *models.ChannelConnection
+	Conn *models.Call
 }
 
 type JobResult struct {
@@ -43,7 +46,7 @@ func HandleWork(id int, rt *runtime.Runtime, wg *sync.WaitGroup, jobChannel <-ch
 	}
 }
 
-func RetryCall(workerId int, rt *runtime.Runtime, conn *models.ChannelConnection) error {
+func RetryCall(workerId int, rt *runtime.Runtime, conn *models.Call) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 	defer cancel()
 	oa, err := models.GetOrgAssets(ctx, rt, conn.OrgID())
@@ -53,7 +56,7 @@ func RetryCall(workerId int, rt *runtime.Runtime, conn *models.ChannelConnection
 
 	channel := oa.ChannelByID(conn.ChannelID())
 	if channel == nil {
-		err = models.UpdateChannelConnectionStatuses(ctx, rt.DB, []models.ConnectionID{conn.ID()}, models.ConnectionStatusFailed)
+		err = models.BulkUpdateCallStatuses(ctx, rt.DB, []models.CallID{conn.ID()}, models.CallStatusFailed)
 		if err != nil {
 			return errors.Wrapf(err, "error marking call as failed due to missing channel with id %v", conn.ChannelID())
 		}
@@ -65,8 +68,7 @@ func RetryCall(workerId int, rt *runtime.Runtime, conn *models.ChannelConnection
 		return errors.Wrapf(err, "unable to load contact urn for urn_id %v", conn.ContactURNID())
 	}
 
-	err = ivr.RequestCallStartForConnection(ctx, rt, channel, urn, conn)
-	if err != nil {
+	if _, err := ivr.RequestStartForCall(ctx, rt, channel, urn, conn); err != nil {
 		return err
 	}
 

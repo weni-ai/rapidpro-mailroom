@@ -216,23 +216,19 @@ func RequestStartForCall(ctx context.Context, rt *runtime.Runtime, channel *mode
 	if maxCalls != "" {
 		maxCalls, _ := strconv.Atoi(maxCalls)
 
-		// max calls is set, lets see how many are currently active on this channel
-		if maxCalls > 0 {
-			count, err := models.ActiveCallCount(ctx, rt.DB, channel.ID())
-			if err != nil {
-				return nil, errors.Wrapf(err, "error finding number of active calls")
-			}
+		// India: throttle whenever max_concurrent_events is set, even when value is 0
+		count, err := models.ActiveCallCount(ctx, rt.DB, channel.ID())
+		if err != nil {
+			return nil, errors.Wrapf(err, "error finding number of active calls")
+		}
 
-			// we are at max calls, do not move on
-			if count >= maxCalls {
-				logrus.WithField("channel_id", channel.ID()).Info("call being queued, max concurrent reached")
-				err := call.MarkThrottled(ctx, rt.DB, time.Now())
-				if err != nil {
-					return nil, errors.Wrapf(err, "error marking call as throttled")
-				}
-				return nil, nil
+		if count >= maxCalls {
+			logrus.WithField("channel_id", channel.ID()).Info("call being queued, max concurrent reached")
+			err := call.MarkThrottled(ctx, rt.DB, time.Now())
+			if err != nil {
+				return nil, errors.Wrapf(err, "error marking call as throttled")
 			}
-			return nil
+			return nil, nil
 		}
 	}
 
