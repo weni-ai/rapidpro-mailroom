@@ -64,6 +64,7 @@ const (
 		},
 		"resume": {
 			"event": {
+				"uuid": "019838b3-c982-7adc-a11b-c39e57005264",
 				"type": "msg_received",
 				"created_on": "2000-01-01T00:00:00.000000000-00:00",
 				"msg": {
@@ -72,8 +73,7 @@ const (
 						"uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91"
 					},
 					"text": "$$MESSAGE$$",
-					"urn": "tel:+12065551212",
-					"uuid": "9bf91c2b-ce58-4cef-aacc-281e03f69ab5"
+					"urn": "tel:+12065551212"
 				}
 			},
             "resumed_on": "2000-01-01T00:00:00.000000000-00:00",
@@ -112,6 +112,7 @@ const (
 		},
 		"trigger": {
 			"event": {
+				"uuid": "019838b2-fcda-76a1-a692-3dcba5ec4eaa",
 				"type": "msg_received",
 				"created_on": "2000-01-01T00:00:00.000000000-00:00",
 				"msg": {
@@ -178,9 +179,9 @@ const (
 )
 
 func TestServer(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
 	wg := &sync.WaitGroup{}
 
@@ -195,13 +196,13 @@ func TestServer(t *testing.T) {
 	var session json.RawMessage
 
 	// add a trigger for our campaign flow with 'trigger'
-	testdb.InsertKeywordTrigger(rt, testdb.Org1, testdb.BackgroundFlow, []string{"trigger"}, models.MatchOnly, nil, nil, nil)
+	testdb.InsertKeywordTrigger(t, rt, testdb.Org1, testdb.BackgroundFlow, []string{"trigger"}, models.MatchOnly, nil, nil, nil)
 
 	// and a trigger which will trigger an IVR flow
-	testdb.InsertKeywordTrigger(rt, testdb.Org1, testdb.IVRFlow, []string{"ivr"}, models.MatchOnly, nil, nil, nil)
+	testdb.InsertKeywordTrigger(t, rt, testdb.Org1, testdb.IVRFlow, []string{"ivr"}, models.MatchOnly, nil, nil, nil)
 
 	// also add a catch all
-	testdb.InsertCatchallTrigger(rt, testdb.Org1, testdb.BackgroundFlow, nil, nil, nil)
+	testdb.InsertCatchallTrigger(t, rt, testdb.Org1, testdb.BackgroundFlow, nil, nil, nil)
 
 	tcs := []struct {
 		URL              string

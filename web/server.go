@@ -3,7 +3,6 @@ package web
 import (
 	"compress/flate"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -31,8 +30,17 @@ type route struct {
 
 var routes []*route
 
-func RegisterRoute(method string, pattern string, handler Handler) {
-	routes = append(routes, &route{method, pattern, handler})
+// PublicRoute registers a route that handles direct requests from the internet
+func PublicRoute(method string, pattern string, handler Handler) {
+	routes = append(routes, &route{method, "/mr" + pattern, handler})
+}
+
+// InternalRoute registers a route that handles internal requests between components
+func InternalRoute(method string, pattern string, handler Handler) {
+	routes = append(routes, &route{method, "/mi" + pattern, requireAuthToken(handler)})
+
+	// for backwards compatibility
+	routes = append(routes, &route{method, "/mr" + pattern, requireAuthToken(handler)})
 }
 
 type Server struct {
@@ -62,8 +70,6 @@ func NewServer(ctx context.Context, rt *runtime.Runtime, wg *sync.WaitGroup) *Se
 	router.NotFound(handle404)
 	router.MethodNotAllowed(handle405)
 	router.Get("/", s.WrapHandler(handleIndex))
-	router.Get("/mr/", s.WrapHandler(handleIndex))
-	router.Post("/mr/test_errors", s.WrapHandler(RequireAuthToken(JSONPayload(handleTestErrors))))
 
 	// and all registered routes
 	for _, route := range routes {
@@ -139,26 +145,6 @@ func handleIndex(ctx context.Context, rt *runtime.Runtime, r *http.Request, w ht
 		"component": "mailroom",
 		"version":   rt.Config.Version,
 	})
-}
-
-type testErrorsRequest struct {
-	Log    string
-	Return string
-	Panic  string
-}
-
-func handleTestErrors(ctx context.Context, rt *runtime.Runtime, r *testErrorsRequest) (any, int, error) {
-	if r.Log != "" {
-		slog.Error(r.Log)
-	}
-	if r.Return != "" {
-		return nil, http.StatusInternalServerError, errors.New(r.Return)
-	}
-	if r.Panic != "" {
-		panic(r.Panic)
-	}
-
-	return map[string]any{}, http.StatusOK, nil
 }
 
 func handle404(w http.ResponseWriter, r *http.Request) {

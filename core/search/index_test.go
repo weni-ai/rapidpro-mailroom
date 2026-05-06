@@ -18,11 +18,11 @@ import (
 )
 
 func TestDeindexContacts(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
-	testsuite.ReindexElastic(ctx)
+	testsuite.ReindexElastic(t, rt)
 
 	// ensures changes are visible in elastic
 	refreshElastic := func() {
@@ -35,7 +35,7 @@ func TestDeindexContacts(t *testing.T) {
 	assertSearchCount(t, rt, elastic.Term("org_id", testdb.Org1.ID), 124)
 	assertSearchCount(t, rt, elastic.Term("org_id", testdb.Org2.ID), 121)
 
-	deindexed, err := search.DeindexContactsByID(ctx, rt, testdb.Org1.ID, []models.ContactID{testdb.Bob.ID, testdb.George.ID})
+	deindexed, err := search.DeindexContactsByID(ctx, rt, testdb.Org1.ID, []models.ContactID{testdb.Bob.ID, testdb.Cat.ID})
 	assert.NoError(t, err)
 	assert.Equal(t, 2, deindexed)
 

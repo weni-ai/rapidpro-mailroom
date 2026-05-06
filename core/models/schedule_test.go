@@ -16,9 +16,9 @@ import (
 )
 
 func TestNewSchedule(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 
 	dates.SetNowFunc(dates.NewFixedNow(time.Date(2024, 6, 20, 14, 30, 0, 0, time.UTC)))
 	defer dates.SetNowFunc(time.Now)
@@ -86,25 +86,25 @@ func TestNewSchedule(t *testing.T) {
 }
 
 func TestGetExpired(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	optIn := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
+	optIn := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
 
 	// add a schedule and tie a broadcast to it
-	s1 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-24*time.Hour))
+	s1 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-24*time.Hour))
 
-	testdb.InsertBroadcast(rt, testdb.Org1, "eng", map[i18n.Language]string{"eng": "Test message", "fra": "Un Message"}, optIn, s1,
-		[]*testdb.Contact{testdb.Cathy, testdb.George}, []*testdb.Group{testdb.DoctorsGroup},
+	testdb.InsertBroadcast(t, rt, testdb.Org1, "0199877e-0ed2-790b-b474-35099cea401c", "eng", map[i18n.Language]string{"eng": "Test message", "fra": "Un Message"}, optIn, s1,
+		[]*testdb.Contact{testdb.Ann, testdb.Cat}, []*testdb.Group{testdb.DoctorsGroup},
 	)
 
 	// add another and tie a trigger to it
-	s2 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-48*time.Hour))
+	s2 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-48*time.Hour))
 
-	testdb.InsertScheduledTrigger(rt, testdb.Org1, testdb.Favorites, s2, []*testdb.Group{testdb.DoctorsGroup}, nil, []*testdb.Contact{testdb.Cathy, testdb.George})
+	testdb.InsertScheduledTrigger(t, rt, testdb.Org1, testdb.Favorites, s2, []*testdb.Group{testdb.DoctorsGroup}, nil, []*testdb.Contact{testdb.Ann, testdb.Cat})
 
-	s3 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-72*time.Hour))
+	s3 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-72*time.Hour))
 
 	// get expired schedules
 	schedules, err := models.GetUnfiredSchedules(ctx, rt.DB.DB)
@@ -124,7 +124,7 @@ func TestGetExpired(t *testing.T) {
 	assert.NotNil(t, trigger)
 	assert.Equal(t, testdb.Favorites.ID, trigger.FlowID())
 	assert.Equal(t, testdb.Org1.ID, trigger.OrgID())
-	assert.Equal(t, []models.ContactID{testdb.Cathy.ID, testdb.George.ID}, trigger.ContactIDs())
+	assert.Equal(t, []models.ContactID{testdb.Ann.ID, testdb.Cat.ID}, trigger.ContactIDs())
 	assert.Equal(t, []models.GroupID{testdb.DoctorsGroup.ID}, trigger.IncludeGroupIDs())
 
 	assert.Equal(t, s1, schedules[2].ID)
@@ -136,7 +136,7 @@ func TestGetExpired(t *testing.T) {
 	assert.True(t, bcast.Expressions)
 	assert.Equal(t, optIn.ID, bcast.OptInID)
 	assert.Equal(t, testdb.Org1.ID, bcast.OrgID)
-	assert.Equal(t, []models.ContactID{testdb.Cathy.ID, testdb.George.ID}, bcast.ContactIDs)
+	assert.Equal(t, []models.ContactID{testdb.Ann.ID, testdb.Cat.ID}, bcast.ContactIDs)
 	assert.Equal(t, []models.GroupID{testdb.DoctorsGroup.ID}, bcast.GroupIDs)
 }
 

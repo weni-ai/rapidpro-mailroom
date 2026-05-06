@@ -1,0 +1,173 @@
+[
+    {
+        "label": "assigns the given tickets to the given user",
+        "method": "POST",
+        "path": "/mi/ticket/change_assignee",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "ticket_uuids": [
+                "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                "01992f54-5ab6-725e-be9c-0c6407efd755",
+                "01992f54-5ab6-7498-a7f2-6aa246e45cfe"
+            ],
+            "assignee_id": 5
+        },
+        "status": 200,
+        "response": {
+            "changed_uuids": [
+                "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                "01992f54-5ab6-7498-a7f2-6aa246e45cfe"
+            ],
+            "events": {
+                "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                    {
+                        "uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                        "type": "ticket_assignee_changed",
+                        "created_on": "2025-05-04T12:30:46.123456789Z",
+                        "_user": {
+                            "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                            "name": "Andy Admin"
+                        },
+                        "ticket_uuid": "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                        "assignee": {
+                            "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab",
+                            "name": "Ann D'Agent"
+                        },
+                        "previous": {
+                            "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                            "name": "Andy Admin"
+                        }
+                    },
+                    {
+                        "uuid": "01969b47-0d53-76f8-bd38-d266ec8d3716",
+                        "type": "ticket_assignee_changed",
+                        "created_on": "2025-05-04T12:30:48.123456789Z",
+                        "_user": {
+                            "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                            "name": "Andy Admin"
+                        },
+                        "ticket_uuid": "01992f54-5ab6-7498-a7f2-6aa246e45cfe",
+                        "assignee": {
+                            "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab",
+                            "name": "Ann D'Agent"
+                        }
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE assignee_id = 5",
+                "returns": 3
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "assignee": {
+                        "name": "Ann D'Agent",
+                        "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab"
+                    },
+                    "created_on": "2025-05-04T12:30:46.123456789Z",
+                    "previous": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "ticket_uuid": "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                    "type": "ticket_assignee_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0d53-76f8-bd38-d266ec8d3716",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "assignee": {
+                        "name": "Ann D'Agent",
+                        "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab"
+                    },
+                    "created_on": "2025-05-04T12:30:48.123456789Z",
+                    "ticket_uuid": "01992f54-5ab6-7498-a7f2-6aa246e45cfe",
+                    "type": "ticket_assignee_changed"
+                }
+            }
+        ]
+    },
+    {
+        "label": "unassigns the given tickets if user is null",
+        "method": "POST",
+        "path": "/mi/ticket/change_assignee",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "ticket_uuids": [
+                "01992f54-5ab6-717a-a39e-e8ca91fb7262"
+            ],
+            "assignee_id": null
+        },
+        "status": 200,
+        "response": {
+            "changed_uuids": [
+                "01992f54-5ab6-717a-a39e-e8ca91fb7262"
+            ],
+            "events": {
+                "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                    {
+                        "uuid": "01969b47-190b-76f8-9c0b-2014ddc77094",
+                        "type": "ticket_assignee_changed",
+                        "created_on": "2025-05-04T12:30:51.123456789Z",
+                        "_user": {
+                            "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                            "name": "Andy Admin"
+                        },
+                        "ticket_uuid": "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                        "assignee": null,
+                        "previous": {
+                            "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab",
+                            "name": "Ann D'Agent"
+                        }
+                    }
+                ]
+            }
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE id = 30000 AND assignee_id IS NULL",
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-190b-76f8-9c0b-2014ddc77094",
+                "OrgID": 1,
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "assignee": null,
+                    "created_on": "2025-05-04T12:30:51.123456789Z",
+                    "previous": {
+                        "name": "Ann D'Agent",
+                        "uuid": "27e44553-ab35-482b-a4d4-6f000ec611ab"
+                    },
+                    "ticket_uuid": "01992f54-5ab6-717a-a39e-e8ca91fb7262",
+                    "type": "ticket_assignee_changed"
+                }
+            }
+        ]
+    }
+]

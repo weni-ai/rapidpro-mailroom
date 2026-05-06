@@ -24,11 +24,11 @@ import (
 )
 
 func TestResponseForSprint(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	mockVonage := httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://api.nexmo.com/v1/calls": {
@@ -65,7 +65,7 @@ func TestResponseForSprint(t *testing.T) {
 
 	provider := p.(*service)
 
-	bob, _, bobURNs := testdb.Bob.Load(rt, oa)
+	bob, _, bobURNs := testdb.Bob.Load(t, rt, oa)
 
 	trigger := triggers.NewBuilder(testdb.Favorites.Reference()).Manual().Build()
 	call := models.NewOutgoingCall(testdb.Org1.ID, oa.ChannelByUUID(testdb.VonageChannel.UUID), bob, bobURNs[0].ID, trigger)
@@ -148,9 +148,9 @@ func TestResponseForSprint(t *testing.T) {
 }
 
 func TestRedactValues(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 	ch := oa.ChannelByUUID(testdb.VonageChannel.UUID)
 	svc, _ := ivr.GetService(ch)
 

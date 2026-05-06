@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/null/v3"
+	"github.com/vinovest/sqlx"
 )
 
 // CallID is the type for call IDs
@@ -54,30 +54,30 @@ const (
 // Call models an IVR call
 type Call struct {
 	c struct {
-		ID           CallID      `db:"id"`
-		UUID         null.String `db:"uuid"`
-		OrgID        OrgID       `db:"org_id"`
-		ChannelID    ChannelID   `db:"channel_id"`
-		ContactID    ContactID   `db:"contact_id"`
-		ContactURNID URNID       `db:"contact_urn_id"`
-		ExternalID   string      `db:"external_id"`
-		Status       CallStatus  `db:"status"`
-		SessionUUID  null.String `db:"session_uuid"`
-		Direction    Direction   `db:"direction"`
-		StartedOn    *time.Time  `db:"started_on"`
-		EndedOn      *time.Time  `db:"ended_on"`
-		Duration     int         `db:"duration"`
-		ErrorReason  null.String `db:"error_reason"`
-		ErrorCount   int         `db:"error_count"`
-		NextAttempt  *time.Time  `db:"next_attempt"`
-		Trigger      null.JSON   `db:"trigger"`
-		CreatedOn    time.Time   `db:"created_on"`
-		ModifiedOn   time.Time   `db:"modified_on"`
+		ID           CallID         `db:"id"`
+		UUID         flows.CallUUID `db:"uuid"`
+		OrgID        OrgID          `db:"org_id"`
+		ChannelID    ChannelID      `db:"channel_id"`
+		ContactID    ContactID      `db:"contact_id"`
+		ContactURNID URNID          `db:"contact_urn_id"`
+		ExternalID   string         `db:"external_id"`
+		Status       CallStatus     `db:"status"`
+		SessionUUID  null.String    `db:"session_uuid"`
+		Direction    Direction      `db:"direction"`
+		StartedOn    *time.Time     `db:"started_on"`
+		EndedOn      *time.Time     `db:"ended_on"`
+		Duration     int            `db:"duration"`
+		ErrorReason  null.String    `db:"error_reason"`
+		ErrorCount   int            `db:"error_count"`
+		NextAttempt  *time.Time     `db:"next_attempt"`
+		Trigger      null.JSON      `db:"trigger"`
+		CreatedOn    time.Time      `db:"created_on"`
+		ModifiedOn   time.Time      `db:"modified_on"`
 	}
 }
 
 func (c *Call) ID() CallID                     { return c.c.ID }
-func (c *Call) UUID() flows.CallUUID           { return flows.CallUUID(c.c.UUID) }
+func (c *Call) UUID() flows.CallUUID           { return c.c.UUID }
 func (c *Call) ChannelID() ChannelID           { return c.c.ChannelID }
 func (c *Call) OrgID() OrgID                   { return c.c.OrgID }
 func (c *Call) ContactID() ContactID           { return c.c.ContactID }
@@ -103,7 +103,7 @@ func (c *Call) EngineTrigger(oa *OrgAssets) (flows.Trigger, error) {
 func NewIncomingCall(orgID OrgID, ch *Channel, contact *Contact, urnID URNID, externalID string) *Call {
 	call := &Call{}
 	c := &call.c
-	c.UUID = null.String(flows.NewCallUUID())
+	c.UUID = flows.NewCallUUID()
 	c.OrgID = orgID
 	c.ChannelID = ch.ID()
 	c.ContactID = contact.ID()
@@ -118,7 +118,7 @@ func NewIncomingCall(orgID OrgID, ch *Channel, contact *Contact, urnID URNID, ex
 func NewOutgoingCall(orgID OrgID, ch *Channel, contact *Contact, urnID URNID, trigger flows.Trigger) *Call {
 	call := &Call{}
 	c := &call.c
-	c.UUID = null.String(flows.NewCallUUID())
+	c.UUID = flows.NewCallUUID()
 	c.OrgID = orgID
 	c.ChannelID = ch.ID()
 	c.ContactID = contact.ID()
@@ -144,72 +144,70 @@ func InsertCalls(ctx context.Context, db DBorTx, calls []*Call) error {
 	return BulkQueryBatches(ctx, "inserted IVR calls", db, sqlInsertCall, 1000, is)
 }
 
-const sqlSelectCallByID = `
+const sqlSelectCallByUUID = `
 SELECT
-    cc.id,
-	cc.uuid,
-	cc.org_id,
-    cc.created_on,
-    cc.modified_on,
-    cc.external_id,
-    cc.status,
-    cc.direction,
-    cc.started_on,
-    cc.ended_on,
-    cc.duration,
-    cc.error_reason,
-    cc.error_count,
-    cc.next_attempt,
-    cc.channel_id,
-    cc.contact_id,
-    cc.contact_urn_id,
-    cc.session_uuid,
-	cc.trigger
-           FROM ivr_call as cc
-          WHERE cc.org_id = $1 AND cc.id = $2`
+    id,
+    uuid,
+    org_id,
+    created_on,
+    modified_on,
+    external_id,
+    status,
+    direction,
+    started_on,
+    ended_on,
+    duration,
+    error_reason,
+    error_count,
+    next_attempt,
+    channel_id,
+    contact_id,
+    contact_urn_id,
+    session_uuid,
+    trigger
+           FROM ivr_call
+          WHERE org_id = $1 AND uuid = $2`
 
-// GetCallByID loads a call by id
-func GetCallByID(ctx context.Context, db DBorTx, orgID OrgID, id CallID) (*Call, error) {
+// GetCallByUUID loads a call by its UUID
+func GetCallByUUID(ctx context.Context, db DBorTx, orgID OrgID, uuid flows.CallUUID) (*Call, error) {
 	c := &Call{}
-	err := db.GetContext(ctx, &c.c, sqlSelectCallByID, orgID, id)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load call with id: %d: %w", id, err)
+	if err := db.GetContext(ctx, &c.c, sqlSelectCallByUUID, orgID, uuid); err != nil {
+		return nil, fmt.Errorf("error loading call %s: %w", uuid, err)
 	}
 	return c, nil
 }
 
 const sqlSelectCallByExternalID = `
 SELECT
-    cc.id,
-	cc.uuid,
-	cc.org_id,
-    cc.created_on,
-    cc.modified_on,
-    cc.external_id,
-    cc.status,
-    cc.direction,
-    cc.started_on,
-    cc.ended_on,
-    cc.duration,
-    cc.error_reason,
-    cc.error_count,
-    cc.next_attempt,
-    cc.channel_id,
-    cc.contact_id,
-    cc.contact_urn_id,
-    cc.session_uuid,
-	cc.trigger
-           FROM ivr_call as cc
-          WHERE cc.channel_id = $1 AND cc.external_id = $2
-       ORDER BY cc.id DESC
+    id,
+    uuid,
+    org_id,
+    created_on,
+    modified_on,
+    external_id,
+    status,
+    direction,
+    started_on,
+    ended_on,
+    duration,
+    error_reason,
+    error_count,
+    next_attempt,
+    channel_id,
+    contact_id,
+    contact_urn_id,
+    session_uuid,
+    trigger
+           FROM ivr_call
+          WHERE channel_id = $1 AND external_id = $2
+       ORDER BY id DESC
           LIMIT 1`
 
 // GetCallByExternalID loads a call by its external ID
 func GetCallByExternalID(ctx context.Context, db DBorTx, channelID ChannelID, externalID string) (*Call, error) {
 	c := &Call{}
-	err := db.GetContext(ctx, &c.c, sqlSelectCallByExternalID, channelID, externalID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load call with external id: %s: %w", externalID, err)
+	if err := db.GetContext(ctx, &c.c, sqlSelectCallByExternalID, channelID, externalID); err != nil {
+		return nil, fmt.Errorf("error loading call with external id: %s: %w", externalID, err)
 	}
 	return c, nil
 }

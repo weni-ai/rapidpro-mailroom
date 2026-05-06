@@ -1,0 +1,76 @@
+[
+    {
+        "label": "language changed events from flow",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "019986bb-8253-7e15-89be-65d807aa7b22",
+                    "type": "contact_language_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": "fra"
+                },
+                {
+                    "uuid": "019986bc-70cc-79d4-bd6f-ae78aa17efcd",
+                    "type": "contact_language_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": "spa"
+                }
+            ],
+            "b699a406-7e44-49be-9f01-1a82893e8a10": [
+                {
+                    "uuid": "019986bc-c2a7-7640-b45d-6a41b677909d",
+                    "type": "contact_language_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": ""
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "label": "only last language change applied",
+                "query": "SELECT language FROM contacts_contact WHERE id = 10000",
+                "returns": "spa"
+            },
+            {
+                "label": "empty language becomes null",
+                "query": "SELECT language FROM contacts_contact WHERE id = 10001",
+                "returns": null
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#019986bc-c2a7-7640-b45d-6a41b677909d",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": "",
+                    "type": "contact_language_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#019986bb-8253-7e15-89be-65d807aa7b22",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": "fra",
+                    "type": "contact_language_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#019986bc-70cc-79d4-bd6f-ae78aa17efcd",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "language": "spa",
+                    "type": "contact_language_changed"
+                }
+            }
+        ]
+    }
+]

@@ -5,13 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/gocommon/i18n"
+	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/random"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/flows/triggers"
+	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
@@ -23,55 +27,59 @@ import (
 )
 
 func TestSessionCreationAndUpdating(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
 	dates.SetNowFunc(dates.NewSequentialNow(time.Date(2025, 2, 25, 16, 45, 0, 0, time.UTC), time.Second))
 	random.SetGenerator(random.NewSeededGenerator(123))
 
 	defer dates.SetNowFunc(time.Now)
 	defer random.SetGenerator(random.DefaultGenerator)
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll) // modifies contacts
 
-	testFlows := testdb.ImportFlows(rt, testdb.Org1, "testdata/session_test_flows.json")
+	testFlows := testdb.ImportFlows(t, rt, testdb.Org1, "testdata/session_test_flows.json")
 	flow := testFlows[0]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	trig := triggers.NewBuilder(flow.Reference()).Manual().Build()
-	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Bob, testdb.Alexandra}, trig)
-	scBob, scAlex := scenes[0], scenes[1]
+	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Bob, testdb.Dan}, trig)
+	scBob, scDan := scenes[0], scenes[1]
 
-	assert.Equal(t, time.Minute*5, scBob.WaitTimeout)     // Bob's messages are being sent via courier
-	assert.Equal(t, time.Duration(0), scAlex.WaitTimeout) // Alexandra's messages are being sent via Android
+	assert.Equal(t, time.Minute*5, scBob.WaitTimeout)    // Bob's messages are being sent via courier
+	assert.Equal(t, time.Duration(0), scDan.WaitTimeout) // Dan's messages are being sent via Android
 
 	// check sessions and runs in database
-	assertdb.Query(t, rt.DB, `SELECT contact_id, status, session_type, current_flow_id, ended_on FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
+	assertdb.Query(t, rt.DB, `SELECT contact_uuid::text, status, session_type, current_flow_uuid::text, ended_on FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
 		Columns(map[string]any{
-			"contact_id": int64(testdb.Bob.ID), "status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "ended_on": nil,
+			"contact_uuid": string(testdb.Bob.UUID), "status": "W", "session_type": "M", "current_flow_uuid": string(flow.UUID), "ended_on": nil,
 		})
-	assertdb.Query(t, rt.DB, `SELECT contact_id, status, session_type, current_flow_id, ended_on FROM flows_flowsession WHERE uuid = $1`, scAlex.SessionUUID()).
+	assertdb.Query(t, rt.DB, `SELECT contact_uuid::text, status, session_type, current_flow_uuid::text, ended_on FROM flows_flowsession WHERE uuid = $1`, scDan.SessionUUID()).
 		Columns(map[string]any{
-			"contact_id": int64(testdb.Alexandra.ID), "status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "ended_on": nil,
+			"contact_uuid": string(testdb.Dan.UUID), "status": "W", "session_type": "M", "current_flow_uuid": string(flow.UUID), "ended_on": nil,
 		})
 
 	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scBob.SessionUUID()).
 		Columns(map[string]any{
 			"contact_id": int64(testdb.Bob.ID), "status": "W", "responded": false, "current_node_uuid": "cbff02b0-cd93-481d-a430-b335ab66779e",
 		})
-	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scAlex.SessionUUID()).
+	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scDan.SessionUUID()).
 		Columns(map[string]any{
-			"contact_id": int64(testdb.Alexandra.ID), "status": "W", "responded": false, "current_node_uuid": "cbff02b0-cd93-481d-a430-b335ab66779e",
+			"contact_id": int64(testdb.Dan.ID), "status": "W", "responded": false, "current_node_uuid": "cbff02b0-cd93-481d-a430-b335ab66779e",
 		})
 
+	// check events were persisted to DynamoDB
+	rt.Writers.History.Flush()
+	dyntest.AssertCount(t, rt.Dynamo, "TestHistory", 6)
+
 	testsuite.AssertContactFires(t, rt, testdb.Bob.ID, map[string]time.Time{
-		fmt.Sprintf("E:%s", scBob.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 8, 0, time.UTC), // 10 minutes in future
-		fmt.Sprintf("S:%s", scBob.Session.UUID()): time.Date(2025, 3, 28, 9, 55, 36, 0, time.UTC), // 30 days + rand(1 - 24 hours) in future
+		fmt.Sprintf("E:%s", scBob.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 10, 0, time.UTC), // 10 minutes in future
+		fmt.Sprintf("S:%s", scBob.Session.UUID()): time.Date(2025, 3, 28, 9, 55, 36, 0, time.UTC),  // 30 days + rand(1 - 24 hours) in future
 	})
-	testsuite.AssertContactFires(t, rt, testdb.Alexandra.ID, map[string]time.Time{
-		fmt.Sprintf("T:%s", scAlex.Session.UUID()): time.Date(2025, 2, 25, 16, 50, 27, 0, time.UTC), // 5 minutes in future
-		fmt.Sprintf("E:%s", scAlex.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 21, 0, time.UTC), // 10 minutes in future
-		fmt.Sprintf("S:%s", scAlex.Session.UUID()): time.Date(2025, 3, 28, 12, 9, 23, 0, time.UTC),  // 30 days + rand(1 - 24 hours) in future
+	testsuite.AssertContactFires(t, rt, testdb.Dan.ID, map[string]time.Time{
+		fmt.Sprintf("T:%s", scDan.Session.UUID()): time.Date(2025, 2, 25, 16, 50, 27, 0, time.UTC), // 5 minutes in future
+		fmt.Sprintf("E:%s", scDan.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 23, 0, time.UTC), // 10 minutes in future
+		fmt.Sprintf("S:%s", scDan.Session.UUID()): time.Date(2025, 3, 28, 12, 9, 23, 0, time.UTC),  // 30 days + rand(1 - 24 hours) in future
 	})
 
 	scene := testsuite.ResumeSession(t, rt, oa, testdb.Bob, "no")
@@ -79,9 +87,9 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.Equal(t, time.Duration(0), scene.WaitTimeout) // wait doesn't have a timeout
 
 	// check session and run in database
-	assertdb.Query(t, rt.DB, `SELECT contact_id, status, session_type, current_flow_id, ended_on FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
+	assertdb.Query(t, rt.DB, `SELECT contact_uuid::text, status, session_type, current_flow_uuid::text, ended_on FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
 		Columns(map[string]any{
-			"contact_id": int64(testdb.Bob.ID), "status": "W", "session_type": "M", "current_flow_id": int64(flow.ID), "ended_on": nil,
+			"contact_uuid": string(testdb.Bob.UUID), "status": "W", "session_type": "M", "current_flow_uuid": string(flow.UUID), "ended_on": nil,
 		})
 
 	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scBob.SessionUUID()).
@@ -91,7 +99,7 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 
 	// check we have a new contact fire for wait expiration but not timeout (wait doesn't have a timeout)
 	testsuite.AssertContactFires(t, rt, testdb.Bob.ID, map[string]time.Time{
-		fmt.Sprintf("E:%s", scBob.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 43, 0, time.UTC), // updated
+		fmt.Sprintf("E:%s", scBob.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 42, 0, time.UTC), // updated
 		fmt.Sprintf("S:%s", scBob.Session.UUID()): time.Date(2025, 3, 28, 9, 55, 36, 0, time.UTC),  // unchanged
 	})
 
@@ -101,8 +109,8 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 	assert.Equal(t, time.Duration(0), scene.WaitTimeout) // flow has ended
 
 	// check session and run in database
-	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
-		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_id": nil})
+	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_uuid::text FROM flows_flowsession WHERE uuid = $1`, scBob.SessionUUID()).
+		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_uuid": nil})
 
 	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scBob.SessionUUID()).
 		Columns(map[string]any{
@@ -114,11 +122,11 @@ func TestSessionCreationAndUpdating(t *testing.T) {
 }
 
 func TestSingleSprintSession(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetValkey | testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey|testsuite.ResetData|testsuite.ResetDynamo)
 
-	testFlows := testdb.ImportFlows(rt, testdb.Org1, "testdata/session_test_flows.json")
+	testFlows := testdb.ImportFlows(t, rt, testdb.Org1, "testdata/session_test_flows.json")
 	flow := testFlows[1]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
@@ -128,8 +136,8 @@ func TestSingleSprintSession(t *testing.T) {
 	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Bob}, trig)
 
 	// check session and run in database
-	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id FROM flows_flowsession WHERE uuid = $1`, scenes[0].SessionUUID()).
-		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_id": nil})
+	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_uuid FROM flows_flowsession WHERE uuid = $1`, scenes[0].SessionUUID()).
+		Columns(map[string]any{"status": "C", "session_type": "M", "current_flow_uuid": nil})
 
 	assertdb.Query(t, rt.DB, `SELECT contact_id, status, responded, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, scenes[0].SessionUUID()).
 		Columns(map[string]any{
@@ -141,29 +149,28 @@ func TestSingleSprintSession(t *testing.T) {
 }
 
 func TestSessionWithSubflows(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
 	dates.SetNowFunc(dates.NewSequentialNow(time.Date(2025, 2, 25, 16, 45, 0, 0, time.UTC), time.Second))
 	random.SetGenerator(random.NewSeededGenerator(123))
 
 	defer dates.SetNowFunc(time.Now)
 	defer random.SetGenerator(random.DefaultGenerator)
-	defer testsuite.Reset(testsuite.ResetValkey | testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey|testsuite.ResetData|testsuite.ResetDynamo)
 
-	testFlows := testdb.ImportFlows(rt, testdb.Org1, "testdata/session_test_flows.json")
+	testFlows := testdb.ImportFlows(t, rt, testdb.Org1, "testdata/session_test_flows.json")
 	parent, child := testFlows[2], testFlows[3]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
-	startID := testdb.InsertFlowStart(rt, testdb.Org1, testdb.Admin, parent, []*testdb.Contact{testdb.Cathy})
+	startID := testdb.InsertFlowStart(t, rt, testdb.Org1, testdb.Admin, parent, []*testdb.Contact{testdb.Ann})
 
-	mc, contact, _ := testdb.Cathy.Load(rt, oa)
+	mc, contact, _ := testdb.Ann.Load(t, rt, oa)
 	scene := runner.NewScene(mc, contact)
-	scene.Interrupt = true
 	scene.StartID = startID
 
-	err = scene.StartSession(ctx, rt, oa, triggers.NewBuilder(parent.Reference()).Manual().Build())
+	err = scene.StartSession(ctx, rt, oa, triggers.NewBuilder(parent.Reference()).Manual().Build(), true)
 	require.NoError(t, err)
 	err = scene.Commit(ctx, rt, oa)
 	require.NoError(t, err)
@@ -171,9 +178,9 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.Equal(t, time.Duration(0), scene.WaitTimeout) // no timeout on wait
 
 	// check session amd runs in the db
-	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id, ended_on FROM flows_flowsession WHERE uuid = $1`, scene.SessionUUID()).
+	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_uuid::text, ended_on FROM flows_flowsession WHERE uuid = $1`, scene.SessionUUID()).
 		Columns(map[string]any{
-			"status": "W", "session_type": "M", "current_flow_id": int64(child.ID), "ended_on": nil,
+			"status": "W", "session_type": "M", "current_flow_uuid": string(child.UUID), "ended_on": nil,
 		})
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowrun WHERE session_uuid = $1`, scene.SessionUUID()).Returns(2)
@@ -183,17 +190,17 @@ func TestSessionWithSubflows(t *testing.T) {
 		Columns(map[string]any{"status": "W"})
 
 	// check we have a contact fire for wait expiration but not timeout
-	testsuite.AssertContactFires(t, rt, testdb.Cathy.ID, map[string]time.Time{
+	testsuite.AssertContactFires(t, rt, testdb.Ann.ID, map[string]time.Time{
 		fmt.Sprintf("E:%s", scene.Session.UUID()): time.Date(2025, 2, 25, 16, 55, 16, 0, time.UTC), // 10 minutes in future
 		fmt.Sprintf("S:%s", scene.Session.UUID()): time.Date(2025, 3, 28, 9, 55, 36, 0, time.UTC),  // 30 days + rand(1 - 24 hours) in future
 	})
 
 	modelSession, err := models.GetWaitingSessionForContact(ctx, rt, oa, contact, scene.Session.UUID())
 	require.NoError(t, err)
-	assert.Equal(t, scene.Session.UUID(), modelSession.UUID())
-	assert.Equal(t, child.ID, modelSession.CurrentFlowID())
+	assert.Equal(t, scene.Session.UUID(), modelSession.UUID)
+	assert.Equal(t, child.UUID, modelSession.CurrentFlowUUID)
 
-	msg2 := flows.NewMsgIn(testdb.Cathy.URN, nil, "yes", nil, "")
+	msg2 := flows.NewMsgIn(testdb.Ann.URN, nil, "yes", nil, "")
 	scene = runner.NewScene(mc, contact)
 
 	err = scene.ResumeSession(ctx, rt, oa, modelSession, resumes.NewMsg(events.NewMsgReceived(msg2)))
@@ -205,34 +212,34 @@ func TestSessionWithSubflows(t *testing.T) {
 	assert.Equal(t, time.Duration(0), scene.WaitTimeout) // flow has ended
 
 	// check we have no contact fires for wait expiration or timeout
-	testsuite.AssertContactFires(t, rt, testdb.Cathy.ID, map[string]time.Time{})
+	testsuite.AssertContactFires(t, rt, testdb.Ann.ID, map[string]time.Time{})
 }
 
 func TestSessionFailedStart(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
 	dates.SetNowFunc(dates.NewSequentialNow(time.Date(2025, 2, 25, 16, 45, 0, 0, time.UTC), time.Second))
 	random.SetGenerator(random.NewSeededGenerator(123))
 
 	defer dates.SetNowFunc(time.Now)
 	defer random.SetGenerator(random.DefaultGenerator)
-	defer testsuite.Reset(testsuite.ResetValkey | testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey|testsuite.ResetData|testsuite.ResetDynamo)
 
-	testFlows := testdb.ImportFlows(rt, testdb.Org1, "testdata/ping_pong.json")
+	testFlows := testdb.ImportFlows(t, rt, testdb.Org1, "testdata/ping_pong.json")
 	ping, pong := testFlows[0], testFlows[1]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	trig := triggers.NewBuilder(ping.Reference()).Manual().Build()
-	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Cathy}, trig)
+	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Ann}, trig)
 
 	assert.Equal(t, flows.SessionStatusFailed, scenes[0].Session.Status())
 	assert.Len(t, scenes[0].Session.Runs(), 201)
 
 	// check session in database
-	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_id FROM flows_flowsession`).
-		Columns(map[string]any{"status": "F", "session_type": "M", "current_flow_id": nil})
+	assertdb.Query(t, rt.DB, `SELECT status, session_type, current_flow_uuid FROM flows_flowsession`).
+		Columns(map[string]any{"status": "F", "session_type": "M", "current_flow_uuid": nil})
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowsession WHERE ended_on IS NOT NULL`).Returns(1)
 
 	// check the state of all the created runs
@@ -243,23 +250,23 @@ func TestSessionFailedStart(t *testing.T) {
 }
 
 func TestFlowStats(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetValkey | testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey|testsuite.ResetData|testsuite.ResetDynamo)
 
 	defer random.SetGenerator(random.DefaultGenerator)
 	random.SetGenerator(random.NewSeededGenerator(123))
 
-	testFlows := testdb.ImportFlows(rt, testdb.Org1, "testdata/flow_stats_test.json")
+	testFlows := testdb.ImportFlows(t, rt, testdb.Org1, "testdata/flow_stats_test.json")
 	flow := testFlows[0]
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
 	require.NoError(t, err)
 
 	trig := triggers.NewBuilder(flow.Reference()).Manual().Build()
-	testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Bob, testdb.Alexandra, testdb.George}, trig)
+	testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Bob, testdb.Dan, testdb.Cat}, trig)
 
 	// should have a single record of all 3 contacts going through the first segment
 	var activityCounts []*models.FlowActivityCount
@@ -280,18 +287,18 @@ func TestFlowStats(t *testing.T) {
 	})
 	assertFlowResultCounts(t, rt, flow.ID, map[string]int{})
 
-	assertvk.Keys(t, rc, "recent_contacts:*", []string{
+	assertvk.Keys(t, vc, "recent_contacts:*", []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 	})
 
 	// all 3 contacts went from first msg to the color split - no operands recorded for this segment
-	assertvk.ZRange(t, rc, "recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", 0, -1,
+	assertvk.ZRange(t, vc, "recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", 0, -1,
 		[]string{"bzXDPJHreu|10001|", "PYVP90uqWA|10003|", "RtWDACk2SS|10002|"},
 	)
 
 	testsuite.ResumeSession(t, rt, oa, testdb.Bob, "blue")
-	testsuite.ResumeSession(t, rt, oa, testdb.Alexandra, "BLUE")
-	testsuite.ResumeSession(t, rt, oa, testdb.George, "teal")
+	testsuite.ResumeSession(t, rt, oa, testdb.Dan, "BLUE")
+	testsuite.ResumeSession(t, rt, oa, testdb.Cat, "teal")
 
 	assertFlowActivityCounts(t, rt, flow.ID, map[string]int{
 		"node:072b95b3-61c3-4e0e-8dd1-eb7481083f94":                                         1,
@@ -307,7 +314,7 @@ func TestFlowStats(t *testing.T) {
 	})
 	assertFlowResultCounts(t, rt, flow.ID, map[string]int{"color/Blue": 2, "color/Other": 1})
 
-	testsuite.ResumeSession(t, rt, oa, testdb.George, "azure")
+	testsuite.ResumeSession(t, rt, oa, testdb.Cat, "azure")
 
 	assertFlowActivityCounts(t, rt, flow.ID, map[string]int{
 		"node:072b95b3-61c3-4e0e-8dd1-eb7481083f94":                                         1,
@@ -323,7 +330,7 @@ func TestFlowStats(t *testing.T) {
 	})
 	assertFlowResultCounts(t, rt, flow.ID, map[string]int{"color/Blue": 2, "color/Other": 1})
 
-	assertvk.Keys(t, rc, "recent_contacts:*", []string{
+	assertvk.Keys(t, vc, "recent_contacts:*", []string{
 		"recent_contacts:5fd2e537-0534-4c12-8425-bef87af09d46:072b95b3-61c3-4e0e-8dd1-eb7481083f94", // "what's your fav color" -> color split
 		"recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", // color split :: Blue exit -> next node
 		"recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", // color split :: Other exit -> next node
@@ -334,29 +341,29 @@ func TestFlowStats(t *testing.T) {
 	})
 
 	// check recent operands for color split :: Blue exit -> next node
-	assertvk.ZRange(t, rc, "recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", 0, -1,
+	assertvk.ZRange(t, vc, "recent_contacts:c02fc3ba-369a-4c87-9bc4-c3b376bda6d2:57b50d33-2b5a-4726-82de-9848c61eff6e", 0, -1,
 		[]string{"5dyuJzp6MB|10001|blue", "ZZ/N3THKKL|10003|BLUE"},
 	)
 
 	// check recent operands for color split :: Other exit -> next node
-	assertvk.ZRange(t, rc, "recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", 0, -1,
+	assertvk.ZRange(t, vc, "recent_contacts:ea6c38dc-11e2-4616-9f3e-577e44765d44:8712db6b-25ff-4789-892c-581f24eeeb95", 0, -1,
 		[]string{"bPiuaeAX6V|10002|teal", "/MpdX9skhq|10002|azure"},
 	)
 
 	// check recent operands for split by expression :: Other exit -> next node
-	assertvk.ZRange(t, rc, "recent_contacts:2b698218-87e5-4ab8-922e-e65f91d12c10:88d8bf00-51ce-4e5e-aae8-4f957a0761a0", 0, -1,
+	assertvk.ZRange(t, vc, "recent_contacts:2b698218-87e5-4ab8-922e-e65f91d12c10:88d8bf00-51ce-4e5e-aae8-4f957a0761a0", 0, -1,
 		[]string{"QFoOgV99Av|10001|0", "nkcW6vAYAn|10003|0"},
 	)
 
-	testsuite.ResumeSession(t, rt, oa, testdb.George, "blue")
+	testsuite.ResumeSession(t, rt, oa, testdb.Cat, "blue")
 
 	assertFlowResultCounts(t, rt, flow.ID, map[string]int{"color/Blue": 3, "color/Other": 0})
 }
 
 func TestResumeSession(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetStorage|testsuite.ResetDynamo)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshOrg)
 	require.NoError(t, err)
@@ -365,18 +372,18 @@ func TestResumeSession(t *testing.T) {
 	require.NoError(t, err)
 
 	trigger := triggers.NewBuilder(flow.Reference()).Manual().Build()
-	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Cathy}, trigger)
+	scenes := testsuite.StartSessions(t, rt, oa, []*testdb.Contact{testdb.Ann}, trigger)
 	sessionUUID := scenes[0].SessionUUID()
 
 	assertdb.Query(t, rt.DB,
-		`SELECT count(*) FROM flows_flowsession WHERE contact_id = $1 AND current_flow_id = $2
-		 AND status = 'W' AND call_id IS NULL AND output IS NOT NULL`, testdb.Cathy.ID, flow.ID()).Returns(1)
+		`SELECT count(*) FROM flows_flowsession WHERE contact_uuid = $1 AND current_flow_uuid = $2
+		 AND status = 'W' AND call_uuid IS NULL AND output IS NOT NULL`, testdb.Ann.UUID, flow.UUID()).Returns(1)
 
 	assertdb.Query(t, rt.DB,
 		`SELECT count(*) FROM flows_flowrun WHERE contact_id = $1 AND flow_id = $2
-		 AND status = 'W' AND responded = FALSE AND org_id = 1`, testdb.Cathy.ID, flow.ID()).Returns(1)
+		 AND status = 'W' AND responded = FALSE AND org_id = 1`, testdb.Ann.ID, flow.ID()).Returns(1)
 
-	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, testdb.Cathy.ID).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' AND text like '%favorite color%'`, testdb.Ann.ID).Returns(1)
 
 	tcs := []struct {
 		input               string
@@ -390,7 +397,7 @@ func TestResumeSession(t *testing.T) {
 		{ // 0
 			input:               "Red",
 			expectedStatus:      models.SessionStatusWaiting,
-			expectedCurrentFlow: int64(flow.ID()),
+			expectedCurrentFlow: string(flow.UUID()),
 			expectedRunStatus:   models.RunStatusWaiting,
 			expectedNodeUUID:    "48f2ecb3-8e8e-4f7b-9510-1ee08bd6a434",
 			expectedMsgOut:      "Good choice, I like Red too! What is your favorite beer?",
@@ -399,7 +406,7 @@ func TestResumeSession(t *testing.T) {
 		{ // 1
 			input:               "Mutzig",
 			expectedStatus:      models.SessionStatusWaiting,
-			expectedCurrentFlow: int64(flow.ID()),
+			expectedCurrentFlow: string(flow.UUID()),
 			expectedRunStatus:   models.RunStatusWaiting,
 			expectedNodeUUID:    "a84399b1-0e7b-42ee-8759-473137b510db",
 			expectedMsgOut:      "Mmmmm... delicious Mutzig. If only they made red Mutzig! Lastly, what is your name?",
@@ -417,11 +424,11 @@ func TestResumeSession(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		testsuite.ResumeSession(t, rt, oa, testdb.Cathy, tc.input)
+		testsuite.ResumeSession(t, rt, oa, testdb.Ann, tc.input)
 
-		assertdb.Query(t, rt.DB, `SELECT status, current_flow_id, call_id FROM flows_flowsession WHERE uuid = $1 AND output IS NOT NULL AND output_url IS NULL`, sessionUUID).
+		assertdb.Query(t, rt.DB, `SELECT status, current_flow_uuid::text, call_uuid FROM flows_flowsession WHERE uuid = $1 AND output IS NOT NULL AND output_url IS NULL`, sessionUUID).
 			Columns(map[string]any{
-				"status": string(tc.expectedStatus), "current_flow_id": tc.expectedCurrentFlow, "call_id": nil,
+				"status": string(tc.expectedStatus), "current_flow_uuid": tc.expectedCurrentFlow, "call_uuid": nil,
 			}, "%d: session mismatch", i)
 
 		assertdb.Query(t, rt.DB, `SELECT status, responded, flow_id, current_node_uuid::text FROM flows_flowrun WHERE session_uuid = $1`, sessionUUID).
@@ -429,9 +436,79 @@ func TestResumeSession(t *testing.T) {
 				"status": string(tc.expectedRunStatus), "responded": true, "flow_id": int64(flow.ID()), "current_node_uuid": tc.expectedNodeUUID,
 			}, "%d: run mismatch", i)
 
-		assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdb.Cathy.ID).
+		assertdb.Query(t, rt.DB, `SELECT text FROM msgs_msg WHERE contact_id = $1 AND direction = 'O' ORDER BY id DESC LIMIT 1`, testdb.Ann.ID).
 			Columns(map[string]any{"text": string(tc.expectedMsgOut)}, "%d: msg out mismatch", i)
 	}
+}
+
+func TestBroadcast(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo)
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
+	require.NoError(t, err)
+
+	b1 := testdb.InsertBroadcast(t, rt, testdb.Org1, "0199877e-0ed2-790b-b474-35099cea401c", "eng", map[i18n.Language]string{"eng": "Hi", "spa": "Hola"}, nil, models.NilScheduleID, []*testdb.Contact{testdb.Ann, testdb.Bob, testdb.Cat}, nil)
+
+	bcast, err := models.GetBroadcastByID(ctx, rt.DB, b1.ID)
+	require.NoError(t, err)
+
+	test.MockUniverse()
+
+	batch1 := bcast.CreateBatch([]models.ContactID{testdb.Ann.ID, testdb.Bob.ID}, true, false)
+	batch2 := bcast.CreateBatch([]models.ContactID{testdb.Cat.ID}, false, true)
+
+	err = runner.Broadcast(ctx, rt, oa, bcast, batch1)
+	assert.NoError(t, err)
+
+	test.AssertEqualJSON(t, []byte(`[
+		{
+			"Data": {
+				"broadcast_uuid": "0199877e-0ed2-790b-b474-35099cea401c",
+				"created_on": "2025-05-04T12:30:47.123456789Z",
+				"msg": {
+					"channel": {
+						"name": "Twilio",
+						"uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+					},
+					"locale": "eng-US",
+					"text": "Hi",
+					"urn": "tel:+16055742222"
+				},
+				"type": "msg_created"
+			},
+			"OrgID": 1,
+			"PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+			"SK": "evt#01969b47-096b-76f8-ae7f-f8b243c49ff5"
+		},
+		{
+			"Data": {
+				"broadcast_uuid": "0199877e-0ed2-790b-b474-35099cea401c",
+				"created_on": "2025-05-04T12:30:50.123456789Z",
+				"msg": {
+					"channel": {
+						"name": "Twilio",
+						"uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8"
+					},
+					"locale": "eng-US",
+					"text": "Hi",
+					"urn": "tel:+16055741111"
+				},
+				"type": "msg_created"
+			},
+			"OrgID": 1,
+			"PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+			"SK": "evt#01969b47-1523-76f8-bd38-d266ec8d3716"
+		}
+	]`), jsonx.MustMarshal(testsuite.GetHistoryItems(t, rt, false)))
+
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE broadcast_id = $1 AND created_by_id = $2`, bcast.ID, bcast.CreatedByID).Returns(2)
+
+	err = runner.Broadcast(ctx, rt, oa, bcast, batch2)
+	assert.NoError(t, err)
+
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_msg WHERE broadcast_id = $1 AND created_by_id = $2`, bcast.ID, bcast.CreatedByID).Returns(3)
 }
 
 func assertFlowActivityCounts(t *testing.T, rt *runtime.Runtime, flowID models.FlowID, expected map[string]int) {

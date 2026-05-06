@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -60,7 +59,7 @@ type OrgAssets struct {
 
 	flowByUUID    map[assets.FlowUUID]assets.Flow
 	flowByID      map[FlowID]assets.Flow
-	flowCacheLock sync.RWMutex
+	flowCacheLock *sync.RWMutex
 
 	campaigns             []assets.Campaign
 	campaignPointsByField map[FieldID][]*CampaignPoint
@@ -152,8 +151,13 @@ func FlushCache() {
 // NewOrgAssets creates and returns a new org assets objects, potentially using the previous
 // org assets passed in to prevent refetching locations
 func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *OrgAssets, refresh Refresh) (*OrgAssets, error) {
-	// assets are immutable in mailroom so safe to load from readonly database connection
-	db := rt.ReadonlyDB
+	// It's generally safe to load assets from the read replica since in mailroom they are immutable - but sometimes we're
+	// responding to asset changes in RP (e.g. populating a new group). For simplicity we assume any explicit refresh
+	// request means that we need to use the primary DB.
+	db := rt.DB.DB
+	if refresh == RefreshNone {
+		db = rt.ReadonlyDB
+	}
 
 	// build our new assets
 	oa := &OrgAssets{
@@ -171,7 +175,7 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	var err error
 
 	if prev == nil || refresh&RefreshOrg > 0 {
-		oa.org, err = LoadOrg(ctx, db, orgID)
+		oa.org, err = LoadOrg(ctx, rt.Config, db, orgID)
 		if err != nil {
 			return nil, fmt.Errorf("error loading environment for org %d: %w", orgID, err)
 		}
@@ -383,9 +387,11 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 	if prev == nil || refresh&RefreshFlows > 0 {
 		oa.flowByUUID = make(map[assets.FlowUUID]assets.Flow)
 		oa.flowByID = make(map[FlowID]assets.Flow)
+		oa.flowCacheLock = &sync.RWMutex{}
 	} else {
 		oa.flowByUUID = prev.flowByUUID
 		oa.flowByID = prev.flowByID
+		oa.flowCacheLock = prev.flowCacheLock // same mutex for same shared maps
 	}
 
 	if prev == nil || refresh&RefreshTopics > 0 {
@@ -532,7 +538,7 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 }
 
 // CloneForSimulation clones our org assets for simulation and returns a new org assets with the given flow definitions overrided
-func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID]json.RawMessage, testChannels []assets.Channel) (*OrgAssets, error) {
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID][]byte, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.rt, a.OrgID(), a, RefreshFlows)
 	if err != nil {
@@ -550,8 +556,10 @@ func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime,
 		// make a clone of the flow with the provided definition
 		cf := f.cloneWithNewDefinition(newDef)
 
+		clone.flowCacheLock.Lock()
 		clone.flowByUUID[flowUUID] = cf
 		clone.flowByID[cf.ID()] = cf
+		clone.flowCacheLock.Unlock()
 	}
 
 	clone.channels = append(clone.channels, testChannels...)

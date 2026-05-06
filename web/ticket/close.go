@@ -5,57 +5,42 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks/handler"
-	"github.com/nyaruka/mailroom/core/tasks/handler/ctasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/close", web.RequireAuthToken(web.MarshaledResponse(handleClose)))
+	web.InternalRoute(http.MethodPost, "/ticket/close", web.JSONPayload(handleClose))
 }
 
-// Closes any open tickets with the given ids.
+type closeRequest struct {
+	bulkTicketRequest
+}
+
+// Closes the specified tickets if they're open.
 //
 //	{
 //	  "org_id": 123,
 //	  "user_id": 234,
-//	  "ticket_ids": [1234, 2345]
+//	  "ticket_uuids": ["01992f54-5ab6-717a-a39e-e8ca91fb7262", "01992f54-5ab6-725e-be9c-0c6407efd755"],
 //	}
-func handleClose(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
-	request := &bulkTicketRequest{}
-	if err := web.ReadAndValidateJSON(r, request); err != nil {
-		return fmt.Errorf("request failed validation: %w", err), http.StatusBadRequest, nil
-	}
-
-	// grab our org assets
-	oa, err := models.GetOrgAssets(ctx, rt, request.OrgID)
+func handleClose(ctx context.Context, rt *runtime.Runtime, r *closeRequest) (any, int, error) {
+	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, request.TicketIDs)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error loading tickets for org: %d: %w", request.OrgID, err)
+	mod := func(t *models.Ticket) flows.Modifier {
+		return modifiers.NewTicketClose(t.UUID)
 	}
 
-	evts, err := models.CloseTickets(ctx, rt, oa, request.UserID, tickets)
+	eventsByContact, err := modifyTickets(ctx, rt, oa, r.UserID, r.TicketUUIDs, mod)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error closing tickets: %w", err)
 	}
 
-	rc := rt.VK.Get()
-	defer rc.Close()
-
-	for t, e := range evts {
-		if e.EventType() == models.TicketEventTypeClosed {
-			err = handler.QueueTask(rc, e.OrgID(), e.ContactID(), ctasks.NewTicketClosed(t.ID()))
-			if err != nil {
-				return nil, 0, fmt.Errorf("error queueing ticket closed task %d: %w", t.ID(), err)
-			}
-		}
-	}
-
-	return newBulkResponse(evts), http.StatusOK, nil
+	return newBulkResponse(eventsByContact), http.StatusOK, nil
 }

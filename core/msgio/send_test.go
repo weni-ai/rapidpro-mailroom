@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/runtime"
@@ -16,6 +17,7 @@ import (
 )
 
 type msgSpec struct {
+	UUID         flows.EventUUID
 	Channel      *testdb.Channel
 	Contact      *testdb.Contact
 	Failed       bool
@@ -23,13 +25,17 @@ type msgSpec struct {
 }
 
 func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets) *models.Msg {
+	if m.UUID == "" {
+		m.UUID = flows.NewEventUUID()
+	}
+
 	status := models.MsgStatusQueued
 	if m.Failed {
 		status = models.MsgStatusFailed
 	}
 
-	msgID := testdb.InsertOutgoingMsg(rt, testdb.Org1, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority).ID
-	msgs, err := models.GetMessagesByID(context.Background(), rt.DB, testdb.Org1.ID, models.DirectionOut, []models.MsgID{msgID})
+	testdb.InsertOutgoingMsg(t, rt, testdb.Org1, m.UUID, m.Channel, m.Contact, "Hello", nil, status, m.HighPriority)
+	msgs, err := models.GetMessagesByUUID(context.Background(), rt.DB, testdb.Org1.ID, models.DirectionOut, []flows.EventUUID{m.UUID})
 	require.NoError(t, err)
 
 	msg := msgs[0]
@@ -42,18 +48,18 @@ func (m *msgSpec) createMsg(t *testing.T, rt *runtime.Runtime, oa *models.OrgAss
 }
 
 func TestQueueMessages(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
 	mockFCM := rt.FCM.(*testsuite.MockFCMClient)
 
 	// create some Andoid channels
-	androidChannel1 := testdb.InsertChannel(rt, testdb.Org1, "A", "Android 1", "123", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID1"})
-	androidChannel2 := testdb.InsertChannel(rt, testdb.Org1, "A", "Android 2", "234", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID2"})
-	testdb.InsertChannel(rt, testdb.Org1, "A", "Android 3", "456", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID3"})
+	androidChannel1 := testdb.InsertChannel(t, rt, testdb.Org1, "A", "Android 1", "123", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID1"})
+	androidChannel2 := testdb.InsertChannel(t, rt, testdb.Org1, "A", "Android 2", "234", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID2"})
+	testdb.InsertChannel(t, rt, testdb.Org1, "A", "Android 3", "456", []string{"tel"}, "SR", map[string]any{"FCM_ID": "FCMID3"})
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshChannels)
 	require.NoError(t, err)
@@ -77,7 +83,7 @@ func TestQueueMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					Channel: testdb.TwilioChannel,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 				},
 				{
 					Channel: androidChannel1,
@@ -85,7 +91,7 @@ func TestQueueMessages(t *testing.T) {
 				},
 				{
 					Channel: testdb.TwilioChannel,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 				},
 				{
 					Channel:      testdb.TwilioChannel,
@@ -94,7 +100,7 @@ func TestQueueMessages(t *testing.T) {
 				},
 			},
 			QueueSizes: map[string][]int{
-				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // 2 default priority messages for Cathy
+				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0": {2}, // 2 default priority messages for Ann
 				"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/1": {1}, // 1 high priority message for Bob
 			},
 			FCMTokensSynced: []string{"FCMID1"},
@@ -105,7 +111,7 @@ func TestQueueMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					Channel: androidChannel1,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 				},
 				{
 					Channel: androidChannel2,
@@ -113,7 +119,7 @@ func TestQueueMessages(t *testing.T) {
 				},
 				{
 					Channel: androidChannel1,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 				},
 			},
 			QueueSizes:      map[string][]int{},
@@ -125,7 +131,7 @@ func TestQueueMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					Channel: testdb.TwilioChannel,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 					Failed:  true,
 				},
 			},
@@ -138,7 +144,7 @@ func TestQueueMessages(t *testing.T) {
 			Msgs: []msgSpec{
 				{
 					Channel: nil,
-					Contact: testdb.Cathy,
+					Contact: testdb.Ann,
 				},
 			},
 			QueueSizes:      map[string][]int{},
@@ -150,15 +156,16 @@ func TestQueueMessages(t *testing.T) {
 	for _, tc := range tests {
 		msgs := make([]*models.MsgOut, len(tc.Msgs))
 		for i, ms := range tc.Msgs {
-			msgs[i] = &models.MsgOut{Msg: ms.createMsg(t, rt, oa)}
+			contact, _, _ := ms.Contact.Load(t, rt, oa)
+			msgs[i] = &models.MsgOut{Msg: ms.createMsg(t, rt, oa), Contact: contact}
 		}
 
-		rc.Do("FLUSHDB")
+		vc.Do("FLUSHDB")
 		mockFCM.Messages = nil
 
 		msgio.QueueMessages(ctx, rt, msgs)
 
-		testsuite.AssertCourierQueues(t, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
+		testsuite.AssertCourierQueues(t, rt, tc.QueueSizes, "courier queue sizes mismatch in '%s'", tc.Description)
 
 		// check the FCM tokens that were synced
 		actualTokens := make([]string, len(mockFCM.Messages))

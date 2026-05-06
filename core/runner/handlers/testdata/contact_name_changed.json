@@ -1,0 +1,164 @@
+[
+    {
+        "label": "name changed events from UI",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "019986bb-8253-7e15-89be-65d807aa7b22",
+                    "type": "contact_name_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "name": "Fred"
+                },
+                {
+                    "uuid": "019986bc-70cc-79d4-bd6f-ae78aa17efcd",
+                    "type": "contact_name_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "name": "Tarzan"
+                }
+            ],
+            "b699a406-7e44-49be-9f01-1a82893e8a10": [
+                {
+                    "uuid": "019986bc-c2a7-7640-b45d-6a41b677909d",
+                    "type": "contact_name_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "name": ""
+                }
+            ],
+            "cd024bcd-f473-4719-a00a-bd0bb1190135": [
+                {
+                    "uuid": "019986bd-8e2a-747f-8b1a-699800982794",
+                    "type": "contact_name_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "name": "Geoff Newman"
+                }
+            ],
+            "d709c157-4606-4d41-9df3-9e9c9b4ae2d4": [
+                {
+                    "uuid": "019986bd-ebfa-7ffb-9710-ae3ca6194404",
+                    "type": "contact_name_changed",
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "_user": {
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                        "name": "Andy Admin"
+                    },
+                    "name": "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+                }
+            ]
+        },
+        "user_id": 3,
+        "db_assertions": [
+            {
+                "label": "only last name change applied",
+                "query": "SELECT name FROM contacts_contact WHERE id = 10000",
+                "returns": "Tarzan"
+            },
+            {
+                "label": "empty name becomes null",
+                "query": "SELECT name FROM contacts_contact WHERE id = 10001",
+                "returns": null
+            },
+            {
+                "query": "SELECT name FROM contacts_contact WHERE id = 10002",
+                "returns": "Geoff Newman"
+            },
+            {
+                "label": "long name truncated to 128 chars",
+                "query": "SELECT name FROM contacts_contact WHERE id = 10003",
+                "returns": "😃2345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#b699a406-7e44-49be-9f01-1a82893e8a10",
+                "SK": "evt#019986bc-c2a7-7640-b45d-6a41b677909d",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "name": "",
+                    "type": "contact_name_changed"
+                }
+            },
+            {
+                "PK": "con#d709c157-4606-4d41-9df3-9e9c9b4ae2d4",
+                "SK": "evt#019986bd-ebfa-7ffb-9710-ae3ca6194404",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "name": "😃234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",
+                    "type": "contact_name_changed"
+                }
+            },
+            {
+                "PK": "con#cd024bcd-f473-4719-a00a-bd0bb1190135",
+                "SK": "evt#019986bd-8e2a-747f-8b1a-699800982794",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "name": "Geoff Newman",
+                    "type": "contact_name_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#019986bb-8253-7e15-89be-65d807aa7b22",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "name": "Fred",
+                    "type": "contact_name_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#019986bc-70cc-79d4-bd6f-ae78aa17efcd",
+                "OrgID": 1,
+                "TTL": "2026-09-26T10:54:00Z",
+                "Data": {
+                    "_user": {
+                        "name": "Andy Admin",
+                        "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25"
+                    },
+                    "created_on": "2025-09-26T10:54:00Z",
+                    "name": "Tarzan",
+                    "type": "contact_name_changed"
+                }
+            }
+        ]
+    }
+]

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
 // UpdateContactGroups is our hook for all group changes
@@ -15,7 +15,7 @@ var UpdateContactGroups runner.PreCommitHook = &updateContactGroups{}
 
 type updateContactGroups struct{}
 
-func (h *updateContactGroups) Order() int { return 1 }
+func (h *updateContactGroups) Order() int { return 10 }
 
 func (h *updateContactGroups) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	// build up our list of all adds and removes
@@ -24,12 +24,12 @@ func (h *updateContactGroups) Execute(ctx context.Context, rt *runtime.Runtime, 
 	changed := make(map[models.ContactID]bool, len(scenes))
 
 	// we remove from our groups at once, build up our list
-	for _, events := range scenes {
+	for _, args := range scenes {
 		// we use these sets to track what our final add or remove should be
 		seenAdds := make(map[models.GroupID]*models.GroupAdd)
 		seenRemoves := make(map[models.GroupID]*models.GroupRemove)
 
-		for _, e := range events {
+		for _, e := range args {
 			switch event := e.(type) {
 			case *models.GroupAdd:
 				seenAdds[event.GroupID] = event

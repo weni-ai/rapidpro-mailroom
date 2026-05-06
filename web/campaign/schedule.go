@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/campaign/schedule", web.RequireAuthToken(web.JSONPayload(handleSchedule)))
+	web.InternalRoute(http.MethodPost, "/campaign/schedule", web.JSONPayload(handleSchedule))
 }
 
 // Request to schedule a campaign point. Triggers a background task to create the fires and returns immediately.
@@ -31,14 +31,12 @@ func handleSchedule(ctx context.Context, rt *runtime.Runtime, r *scheduleRequest
 	// we don't actual need the org assets in this function but load them to validate the org id is valid
 	// and they'll probably still be cached by the time the task starts
 	if _, err := models.GetOrgAssets(ctx, rt, r.OrgID); err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	task := &campaigns.ScheduleCampaignPointTask{PointID: r.PointID}
 
-	rc := rt.VK.Get()
-	defer rc.Close()
-	if err := tasks.Queue(rc, tasks.BatchQueue, r.OrgID, task, true); err != nil {
+	if err := tasks.Queue(ctx, rt, rt.Queues.Batch, r.OrgID, task, true); err != nil {
 		return nil, 0, fmt.Errorf("error queuing schedule campaign point task: %w", err)
 	}
 

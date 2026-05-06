@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/core/goflow"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
@@ -23,7 +25,7 @@ type Scene struct {
 	Call        *flows.Call
 	StartID     models.StartID
 	IncomingMsg *models.MsgInRef
-	Interrupt   bool
+	Broadcast   *models.Broadcast
 
 	// optional state set during processing
 	DBSession           *models.Session
@@ -31,9 +33,11 @@ type Scene struct {
 	Sprint              flows.Sprint
 	WaitTimeout         time.Duration
 	PriorRunModifiedOns map[flows.RunUUID]time.Time
+	OutgoingMsgs        []*models.MsgOut
 
-	preCommits  map[PreCommitHook][]any
-	postCommits map[PostCommitHook][]any
+	preCommits    map[PreCommitHook][]any
+	postCommits   map[PostCommitHook][]any
+	persistEvents []*models.Event
 
 	// can be overridden by tests
 	Engine func(*runtime.Runtime) flows.Engine
@@ -71,13 +75,6 @@ func (s *Scene) SprintUUID() flows.SprintUUID {
 	return s.Sprint.UUID()
 }
 
-// LocateEvent finds the flow and node UUID for an event belonging to this session
-func (s *Scene) LocateEvent(e flows.Event) (*models.Flow, flows.NodeUUID) {
-	run, step := s.Session.FindStep(e.StepUUID())
-	flow := run.Flow().Asset().(*models.Flow)
-	return flow, step.NodeUUID()
-}
-
 func (s *Scene) AddEvent(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, e flows.Event, userID models.UserID) error {
 	handler, found := eventHandlers[e.Type()]
 	if !found {
@@ -86,6 +83,22 @@ func (s *Scene) AddEvent(ctx context.Context, rt *runtime.Runtime, oa *models.Or
 
 	if err := handler(ctx, rt, oa, s, e, userID); err != nil {
 		return err
+	}
+
+	// turn our userID into a reference
+	var user *models.User
+	if userID != models.NilUserID {
+		user = oa.UserByID(userID)
+	}
+
+	if models.PersistEvent(e) {
+		e.SetUser(user.Reference())
+
+		s.persistEvents = append(s.persistEvents, &models.Event{
+			Event:       e,
+			OrgID:       oa.OrgID(),
+			ContactUUID: s.ContactUUID(),
+		})
 	}
 
 	return nil
@@ -115,8 +128,19 @@ func (s *Scene) addSprint(ctx context.Context, rt *runtime.Runtime, oa *models.O
 	return nil
 }
 
+func (s *Scene) Interrupt(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, status flows.SessionStatus) error {
+	return addInterruptEvents(ctx, rt, oa, []*Scene{s}, status)
+}
+
 // StartSession starts a new session.
-func (s *Scene) StartSession(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, trigger flows.Trigger) error {
+func (s *Scene) StartSession(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, trigger flows.Trigger, interrupt bool) error {
+	// interrupting supported from here as a convenience
+	if interrupt {
+		if err := addInterruptEvents(ctx, rt, oa, []*Scene{s}, flows.SessionStatusInterrupted); err != nil {
+			return fmt.Errorf("error interrupting existing session: %w", err)
+		}
+	}
+
 	session, sprint, err := s.Engine(rt).NewSession(ctx, oa.SessionAssets(), oa.Env(), s.Contact, trigger, s.Call)
 	if err != nil {
 		return fmt.Errorf("error starting contact %s in flow %s: %w", s.ContactUUID(), trigger.Flow().UUID, err)
@@ -136,21 +160,25 @@ func (s *Scene) ResumeSession(ctx context.Context, rt *runtime.Runtime, oa *mode
 	}
 
 	// does the flow this session is part of still exist?
-	_, err := oa.FlowByID(session.CurrentFlowID())
+	_, err := oa.FlowByUUID(session.CurrentFlowUUID)
 	if err != nil {
-		// if this flow just isn't available anymore, log this error
 		if err == models.ErrNotFound {
-			slog.Error("unable to find flow for resume", "contact", s.ContactUUID(), "session", session.UUID(), "flow_id", session.CurrentFlowID())
+			// if flow doesn't exist, we can't resume, so fail the session
+			slog.Debug("unable to find flow for resume", "contact", s.ContactUUID(), "session", session.UUID, "flow", session.CurrentFlowUUID)
 
-			return models.ExitSessions(ctx, rt.DB, []flows.SessionUUID{session.UUID()}, models.SessionStatusFailed)
+			if err := s.Interrupt(ctx, rt, oa, flows.SessionStatusFailed); err != nil {
+				return fmt.Errorf("error adding interrupt events for unresumable session %s: %w", session.UUID, err)
+			}
+
+			return nil
 		}
-		return fmt.Errorf("error loading session flow: %d: %w", session.CurrentFlowID(), err)
+		return fmt.Errorf("error loading session flow %s: %w", session.CurrentFlowUUID, err)
 	}
 
 	// build our flow session
 	fs, err := session.EngineSession(ctx, rt, oa.SessionAssets(), oa.Env(), s.Contact, s.Call)
 	if err != nil {
-		return fmt.Errorf("unable to create session from output: %w", err)
+		return fmt.Errorf("unable to read session %s: %w", session.UUID, err)
 	}
 
 	// record run modified times prior to resuming so we can figure out which runs are new or updated
@@ -166,10 +194,37 @@ func (s *Scene) ResumeSession(ctx context.Context, rt *runtime.Runtime, oa *mode
 	}
 
 	if err := s.addSprint(ctx, rt, oa, fs, sprint, true); err != nil {
-		return fmt.Errorf("error processing events for session %s: %w", session.UUID(), err)
+		return fmt.Errorf("error processing events for session %s: %w", session.UUID, err)
 	}
 
 	return nil
+}
+
+func (s *Scene) ApplyModifier(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, mod flows.Modifier, userID models.UserID) ([]flows.Event, error) {
+	env := flows.NewAssetsEnvironment(oa.Env(), oa.SessionAssets())
+	eng := goflow.Engine(rt)
+
+	evts := make([]flows.Event, 0)
+	evtLog := func(e flows.Event) { evts = append(evts, e) }
+
+	if _, err := modifiers.Apply(eng, env, oa.SessionAssets(), s.Contact, mod, evtLog); err != nil {
+		return nil, fmt.Errorf("error applying %s modifier to contact %s: %w", mod.Type(), s.Contact.UUID(), err)
+	}
+
+	for _, e := range evts {
+		creditUserID := userID
+
+		// don't credit group changes to the user if they didn't initiate them
+		if e.Type() == events.TypeContactGroupsChanged && mod.Type() != modifiers.TypeGroups {
+			creditUserID = models.NilUserID
+		}
+
+		if err := s.AddEvent(ctx, rt, oa, e, creditUserID); err != nil {
+			return nil, fmt.Errorf("error adding modifier events for contact %s: %w", s.Contact.UUID(), err)
+		}
+	}
+
+	return evts, nil
 }
 
 // AttachPreCommitHook adds an item to be handled by the given pre commit hook
@@ -185,6 +240,30 @@ func (s *Scene) AttachPostCommitHook(hook PostCommitHook, item any) {
 // Commit commits this scene's events
 func (s *Scene) Commit(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets) error {
 	return BulkCommit(ctx, rt, oa, []*Scene{s})
+}
+
+// CreateScenes creates scenes for the given contact ids
+func CreateScenes(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contactIDs []models.ContactID, extraTickets map[models.ContactID][]*models.Ticket) ([]*Scene, error) {
+	mcs, err := models.LoadContacts(ctx, rt.ReadonlyDB, oa, contactIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error loading contacts for new scenes: %w", err)
+	}
+
+	scenes := make([]*Scene, len(mcs))
+	for i, mc := range mcs {
+		if extra, found := extraTickets[mc.ID()]; found {
+			mc.IncludeTickets(extra)
+		}
+
+		c, err := mc.EngineContact(oa)
+		if err != nil {
+			return nil, fmt.Errorf("error creating engine contact for %s: %w", mc.UUID(), err)
+		}
+
+		scenes[i] = NewScene(mc, c)
+	}
+
+	return scenes, nil
 }
 
 // BulkCommit commits the passed in scenes in a single transaction. If that fails, it retries committing each scene one at a time.
@@ -233,6 +312,20 @@ func BulkCommit(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, 
 			}
 		}
 	}
+
+	// send events to be persisted to the history table writer
+	eventsWritten := 0
+	for _, scene := range scenes {
+		for _, evt := range scene.persistEvents {
+			if _, err := rt.Writers.History.Queue(evt); err != nil {
+				return fmt.Errorf("error queuing scene event to writer: %w", err)
+			}
+		}
+
+		eventsWritten += len(scene.persistEvents)
+	}
+
+	slog.Debug("events queued to history writer", "count", eventsWritten)
 
 	if err := ExecutePostCommitHooks(ctx, rt, oa, scenes); err != nil {
 		return fmt.Errorf("error processing post commit hooks: %w", err)

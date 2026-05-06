@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
+	"github.com/nyaruka/mailroom/core/models"
 	_ "github.com/nyaruka/mailroom/core/runner/handlers"
 	"github.com/nyaruka/mailroom/core/tasks/contacts"
 	"github.com/nyaruka/mailroom/testsuite"
@@ -12,22 +13,22 @@ import (
 )
 
 func TestImportContactBatch(t *testing.T) {
-	_, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	_, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	importID := testdb.InsertContactImport(rt, testdb.Org1, testdb.Admin)
-	batch1ID := testdb.InsertContactImportBatch(rt, importID, []byte(`[
+	importID := testdb.InsertContactImport(t, rt, testdb.Org1, models.ImportStatusProcessing, testdb.Admin)
+	batch1ID := testdb.InsertContactImportBatch(t, rt, importID, []byte(`[
 		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
 		{"name": "Leah", "urns": ["tel:+16055740002"]}
 	]`))
-	batch2ID := testdb.InsertContactImportBatch(rt, importID, []byte(`[
+	batch2ID := testdb.InsertContactImportBatch(t, rt, importID, []byte(`[
 		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
 	]`))
 
-	rc.Do("setex", fmt.Sprintf("contact_import_batches_remaining:%d", importID), 10, 2)
+	vc.Do("setex", fmt.Sprintf("contact_import_batches_remaining:%d", importID), 10, 2)
 
 	// perform first batch task...
 	testsuite.QueueBatchTask(t, rt, testdb.Org1, &contacts.ImportContactBatchTask{ContactImportBatchID: batch1ID})

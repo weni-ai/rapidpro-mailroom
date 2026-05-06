@@ -2,49 +2,23 @@
     {
         "label": "error if fields not provided",
         "method": "POST",
-        "path": "/mr/contact/interrupt",
+        "path": "/mi/contact/interrupt",
         "body": {},
         "status": 400,
         "response": {
-            "error": "request failed validation: field 'org_id' is required, field 'user_id' is required, field 'contact_id' is required"
+            "error": "request failed validation: field 'org_id' is required, field 'user_id' is required, field 'contact_ids' is required"
         }
     },
     {
-        "label": "interrupts a contact",
+        "label": "interrupts a single contact synchronously",
         "method": "POST",
-        "path": "/mr/contact/interrupt",
+        "path": "/mi/contact/interrupt",
         "body": {
             "org_id": 1,
             "user_id": 3,
-            "contact_id": 10000
-        },
-        "status": 200,
-        "response": {
-            "sessions": 1
-        },
-        "db_assertions": [
-            {
-                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W'",
-                "count": 1
-            },
-            {
-                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = 10000",
-                "count": 0
-            },
-            {
-                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_id = 10000",
-                "count": 1
-            }
-        ]
-    },
-    {
-        "label": "noop if contact doesn't have a waiting session",
-        "method": "POST",
-        "path": "/mr/contact/interrupt",
-        "body": {
-            "org_id": 1,
-            "user_id": 3,
-            "contact_id": 10000
+            "contact_ids": [
+                10000
+            ]
         },
         "status": 200,
         "response": {
@@ -53,16 +27,93 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W'",
-                "count": 1
+                "returns": 1
             },
             {
-                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_id = 10000",
-                "count": 0
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_uuid = 'a393abc0-283d-4c9b-a1b3-641a035c34bf'",
+                "returns": 0
             },
             {
-                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_id = 10000",
-                "count": 1
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_uuid = 'a393abc0-283d-4c9b-a1b3-641a035c34bf'",
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-0d53-76f8-bd38-d266ec8d3716",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:48.123456789Z",
+                    "flow": {
+                        "name": "Favorites",
+                        "uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85"
+                    },
+                    "run_uuid": "01969b48-2e63-76f8-92ca-6e1d7f550554",
+                    "status": "interrupted",
+                    "type": "run_ended"
+                }
             }
         ]
+    },
+    {
+        "label": "noop if contact doesn't have a waiting session",
+        "method": "POST",
+        "path": "/mi/contact/interrupt",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_ids": [
+                10000
+            ]
+        },
+        "status": 200,
+        "response": {
+            "sessions": 0
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W'",
+                "returns": 1
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'W' AND contact_uuid = 'a393abc0-283d-4c9b-a1b3-641a035c34bf'",
+                "returns": 0
+            },
+            {
+                "query": "SELECT count(*) FROM flows_flowsession WHERE status = 'I' AND contact_uuid = 'a393abc0-283d-4c9b-a1b3-641a035c34bf'",
+                "returns": 1
+            }
+        ]
+    },
+    {
+        "label": "queues interrupt task for multiple contacts",
+        "method": "POST",
+        "path": "/mi/contact/interrupt",
+        "body": {
+            "org_id": 1,
+            "user_id": 3,
+            "contact_ids": [
+                10001,
+                10002
+            ]
+        },
+        "status": 200,
+        "response": {
+            "sessions": 0
+        },
+        "expected_tasks": {
+            "batch/1": [
+                {
+                    "type": "interrupt_sessions",
+                    "payload": {
+                        "contact_ids": [
+                            10001,
+                            10002
+                        ]
+                    }
+                }
+            ]
+        }
     }
 ]

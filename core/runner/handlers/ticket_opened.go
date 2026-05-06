@@ -41,23 +41,38 @@ func handleTicketOpened(ctx context.Context, rt *runtime.Runtime, oa *models.Org
 		assigneeID = assignee.ID()
 	}
 
-	var openedInID models.FlowID
+	var flow *models.Flow
 	if scene.Session != nil {
-		flow, _ := scene.LocateEvent(e)
-		openedInID = flow.ID()
+		flow = e.Step().Run().Flow().Asset().(*models.Flow)
 	}
 
 	ticket := models.NewTicket(
 		event.Ticket.UUID,
 		oa.OrgID(),
 		userID,
-		openedInID,
+		flow,
 		scene.ContactID(),
 		topicID,
 		assigneeID,
 	)
 
-	scene.AttachPreCommitHook(hooks.InsertTickets, hooks.TicketAndNote{Ticket: ticket, Note: event.Note})
+	// make this ticket available to subsequent event handlers - important because ticket open events are often followed
+	// by ticket note events for that same ticket
+	scene.DBContact.IncludeTickets([]*models.Ticket{ticket})
+
+	scene.AttachPreCommitHook(hooks.InsertTickets, ticket)
+
+	if assigneeID == models.NilUserID {
+		// ticket is unassigned so notify all possible assignees except the user who opened the ticket
+		for _, user := range models.GetTicketAssignableUsers(oa) {
+			if userID != user.ID() {
+				scene.AttachPreCommitHook(hooks.InsertNotifications, models.NewTicketsOpenedNotification(oa.OrgID(), user.ID()))
+			}
+		}
+	} else if assigneeID != userID {
+		// ticket is assigned so just notify the assignee if they didn't self-assign
+		scene.AttachPreCommitHook(hooks.InsertNotifications, models.NewTicketActivityNotification(oa.OrgID(), assigneeID))
+	}
 
 	return nil
 }

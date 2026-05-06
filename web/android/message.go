@@ -10,14 +10,14 @@ import (
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks/handler"
-	"github.com/nyaruka/mailroom/core/tasks/handler/ctasks"
+	"github.com/nyaruka/mailroom/core/tasks/realtime"
+	"github.com/nyaruka/mailroom/core/tasks/realtime/ctasks"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/android/message", web.RequireAuthToken(web.JSONPayload(handleMessage)))
+	web.InternalRoute(http.MethodPost, "/android/message", web.JSONPayload(handleMessage))
 }
 
 // Creates a new incoming message from an Android relayer sync.
@@ -40,7 +40,7 @@ type messageRequest struct {
 func handleMessage(ctx context.Context, rt *runtime.Runtime, r *messageRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
 	cu, err := resolveContact(ctx, rt, oa, r.ChannelID, r.Phone)
@@ -63,12 +63,8 @@ func handleMessage(ctx context.Context, rt *runtime.Runtime, r *messageRequest) 
 		return nil, 0, fmt.Errorf("error inserting message: %w", err)
 	}
 
-	rc := rt.VK.Get()
-	defer rc.Close()
-
-	err = handler.QueueTask(rc, r.OrgID, m.ContactID(), &ctasks.MsgReceivedTask{
+	err = realtime.QueueTask(ctx, rt, r.OrgID, m.ContactID(), &ctasks.MsgReceivedTask{
 		ChannelID:     m.ChannelID(),
-		MsgID:         m.ID(),
 		MsgUUID:       m.UUID(),
 		MsgExternalID: m.ExternalID(),
 		URN:           cu.urn,

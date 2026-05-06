@@ -3,12 +3,12 @@ package hooks
 import (
 	"context"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
+	"github.com/vinovest/sqlx"
 )
 
 // UpdateContactLanguage is our hook for contact language changes
@@ -16,14 +16,14 @@ var UpdateContactLanguage runner.PreCommitHook = &updateContactLanguage{}
 
 type updateContactLanguage struct{}
 
-func (h *updateContactLanguage) Order() int { return 1 }
+func (h *updateContactLanguage) Order() int { return 10 }
 
 func (h *updateContactLanguage) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	// build up our list of pairs of contact id and language name
 	updates := make([]*languageUpdate, 0, len(scenes))
-	for s, e := range scenes {
+	for s, args := range scenes {
 		// we only care about the last name change
-		event := e[len(e)-1].(*events.ContactLanguageChanged)
+		event := args[len(args)-1].(*events.ContactLanguageChanged)
 		updates = append(updates, &languageUpdate{s.ContactID(), null.String(event.Language)})
 	}
 
@@ -40,5 +40,5 @@ type languageUpdate struct {
 const sqlUpdateContactLanguage = `
 UPDATE contacts_contact c
    SET language = r.language
-  FROM (VALUES(:id, :language)) AS r(id, language)
- WHERE c.id = r.id::int`
+  FROM (VALUES(:id::int, :language)) AS r(id, language)
+ WHERE c.id = r.id`

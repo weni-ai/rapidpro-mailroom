@@ -43,7 +43,7 @@ func (c *RetryCallsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[stri
 
 	// schedules requests for each call
 	for _, call := range calls {
-		log = log.With("call_id", call.ID())
+		log = log.With("call", call.UUID())
 
 		// if the channel for this call is throttled, move on
 		/*if throttledChannels[call.ChannelID()] {
@@ -90,9 +90,11 @@ func (c *RetryCallsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[stri
 		throttledChannels[call.ChannelID()] = true
 	}
 
-	// log any error inserting our channel logs, but continue
-	if err := models.InsertChannelLogs(ctx, rt, clogs); err != nil {
-		slog.Error("error inserting channel logs", "error", err)
+	// log any error writing our channel logs, but continue
+	for _, clog := range clogs {
+		if _, err := rt.Writers.Main.Queue(clog); err != nil {
+			slog.Error("error queuing IVR channel log to writer", "error", err, "log", clog.UUID)
+		}
 	}
 
 	return map[string]any{"retried": len(calls)}, nil

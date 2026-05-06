@@ -14,7 +14,6 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
@@ -87,15 +86,15 @@ func (t *BulkCampaignTriggerTask) Perform(ctx context.Context, rt *runtime.Runti
 	// store recent fires in redis for this event
 	recentSet := vkutil.NewCappedZSet(fmt.Sprintf(recentFiresKey, t.PointID), recentFiresCap, recentFiresExpire)
 
-	rc := rt.VK.Get()
-	defer rc.Close()
+	vc := rt.VK.Get()
+	defer vc.Close()
 
 	for _, cid := range contactIDs[:min(recentFiresCap, len(contactIDs))] {
 		// set members need to be unique, so we include a random string
 		value := fmt.Sprintf("%s|%d", vkutil.RandomBase64(10), cid)
 		score := float64(dates.Now().UnixNano()) / float64(1e9) // score is UNIX time as floating point
 
-		err := recentSet.Add(ctx, rc, value, score)
+		err := recentSet.Add(ctx, vc, value, score)
 		if err != nil {
 			return fmt.Errorf("error adding recent trigger to set: %w", err)
 		}
@@ -121,7 +120,7 @@ func (t *BulkCampaignTriggerTask) triggerFlow(ctx context.Context, rt *runtime.R
 
 	flowRef := assets.NewFlowReference(flow.UUID(), flow.Name())
 	triggerBuilder := func() flows.Trigger {
-		return triggers.NewBuilder(flowRef).Campaign(campaign, events.NewCampaignFired(campaign, p.UUID)).Build()
+		return triggers.NewBuilder(flowRef).CampaignFired(events.NewCampaignFired(campaign, p.UUID), campaign).Build()
 	}
 
 	if flow.FlowType() == models.FlowTypeVoice {
@@ -159,17 +158,16 @@ func (t *BulkCampaignTriggerTask) triggerFlow(ctx context.Context, rt *runtime.R
 func (t *BulkCampaignTriggerTask) triggerBroadcast(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, p *models.CampaignPoint, contactIDs []models.ContactID) error {
 	// interrupt the contacts if desired
 	if p.StartMode != models.PointModePassive {
-		if _, err := models.InterruptSessionsForContacts(ctx, rt.DB, contactIDs); err != nil {
-			return fmt.Errorf("error interrupting contacts: %w", err)
+		if err := runner.Interrupt(ctx, rt, oa, contactIDs, flows.SessionStatusInterrupted); err != nil {
+			return fmt.Errorf("error interrupting contacts for campaign broadcast: %w", err)
 		}
 	}
 
 	bcast := models.NewBroadcast(oa.OrgID(), p.Translations, i18n.Language(p.BaseLanguage), true, models.NilOptInID, nil, contactIDs, nil, "", models.NoExclusions, models.NilUserID)
-	sends, err := bcast.CreateMessages(ctx, rt, oa, &models.BroadcastBatch{ContactIDs: contactIDs})
-	if err != nil {
-		return fmt.Errorf("error creating campaign point messages: %w", err)
+
+	if err := runner.Broadcast(ctx, rt, oa, bcast, &models.BroadcastBatch{ContactIDs: contactIDs}); err != nil {
+		return fmt.Errorf("error running campaign point broadcast: %w", err)
 	}
 
-	msgio.QueueMessages(ctx, rt, sends)
 	return nil
 }

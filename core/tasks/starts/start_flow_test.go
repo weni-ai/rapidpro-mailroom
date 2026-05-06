@@ -15,14 +15,11 @@ import (
 )
 
 func TestStartFlowTask(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
-	rc := rt.VK.Get()
-	defer rc.Close()
-
-	testdb.InsertWaitingSession(rt, testdb.Org1, testdb.George, models.FlowTypeMessaging, testdb.Favorites, models.NilCallID)
+	testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Cat, models.FlowTypeMessaging, nil, testdb.Favorites)
 
 	tcs := []struct {
 		flowID                   models.FlowID
@@ -44,7 +41,7 @@ func TestStartFlowTask(t *testing.T) {
 			flowID:                   testdb.Favorites.ID,
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
-			queue:                    tasks.BatchQueue,
+			queue:                    rt.Queues.Batch,
 			expectedContactCount:     0,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -56,9 +53,9 @@ func TestStartFlowTask(t *testing.T) {
 			groupIDs:                 []models.GroupID{testdb.DoctorsGroup.ID},
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
-			queue:                    tasks.BatchQueue,
+			queue:                    rt.Queues.Batch,
 			expectedContactCount:     121,
-			expectedBatchCount:       2,
+			expectedBatchCount:       5,
 			expectedTotalCount:       121,
 			expectedStatus:           models.StartStatusCompleted,
 			expectedActiveRuns:       map[models.FlowID]int{testdb.Favorites.ID: 122, testdb.PickANumber.ID: 0, testdb.BackgroundFlow.ID: 0},
@@ -66,10 +63,10 @@ func TestStartFlowTask(t *testing.T) {
 		{ // 2: group and contact (but all already active)
 			flowID:                   testdb.Favorites.ID,
 			groupIDs:                 []models.GroupID{testdb.DoctorsGroup.ID},
-			contactIDs:               []models.ContactID{testdb.Cathy.ID},
+			contactIDs:               []models.ContactID{testdb.Ann.ID},
 			excludeInAFlow:           true,
 			excludeStartedPreviously: true,
-			queue:                    tasks.BatchQueue,
+			queue:                    rt.Queues.Batch,
 			expectedContactCount:     121,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -78,10 +75,10 @@ func TestStartFlowTask(t *testing.T) {
 		},
 		{ // 3: don't exclude started previously
 			flowID:                   testdb.Favorites.ID,
-			contactIDs:               []models.ContactID{testdb.Cathy.ID},
+			contactIDs:               []models.ContactID{testdb.Ann.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -93,7 +90,7 @@ func TestStartFlowTask(t *testing.T) {
 			groupIDs:                 []models.GroupID{testdb.DoctorsGroup.ID},
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeStartedPreviously: true,
-			queue:                    tasks.BatchQueue,
+			queue:                    rt.Queues.Batch,
 			expectedContactCount:     122,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -104,7 +101,7 @@ func TestStartFlowTask(t *testing.T) {
 			flowID:                   testdb.Favorites.ID,
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeStartedPreviously: true,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -116,7 +113,7 @@ func TestStartFlowTask(t *testing.T) {
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -128,7 +125,7 @@ func TestStartFlowTask(t *testing.T) {
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -140,7 +137,7 @@ func TestStartFlowTask(t *testing.T) {
 			query:                    "bob",
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -152,7 +149,7 @@ func TestStartFlowTask(t *testing.T) {
 			query:                    "xyz = 45",
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     0,
 			expectedBatchCount:       0,
 			expectedTotalCount:       0,
@@ -162,7 +159,7 @@ func TestStartFlowTask(t *testing.T) {
 		{ // 10: new contact
 			flowID:               testdb.Favorites.ID,
 			createContact:        true,
-			queue:                tasks.HandlerQueue,
+			queue:                rt.Queues.Realtime,
 			expectedContactCount: 1,
 			expectedBatchCount:   1,
 			expectedTotalCount:   1,
@@ -174,7 +171,7 @@ func TestStartFlowTask(t *testing.T) {
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -186,7 +183,7 @@ func TestStartFlowTask(t *testing.T) {
 			contactIDs:               []models.ContactID{testdb.Bob.ID},
 			excludeInAFlow:           false,
 			excludeStartedPreviously: true,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -195,11 +192,11 @@ func TestStartFlowTask(t *testing.T) {
 		},
 		{ // 13: exclude group
 			flowID:                   testdb.Favorites.ID,
-			contactIDs:               []models.ContactID{testdb.Cathy.ID, testdb.Bob.ID},
-			excludeGroupIDs:          []models.GroupID{testdb.DoctorsGroup.ID}, // should exclude Cathy
+			contactIDs:               []models.ContactID{testdb.Ann.ID, testdb.Bob.ID},
+			excludeGroupIDs:          []models.GroupID{testdb.DoctorsGroup.ID}, // should exclude Ann
 			excludeInAFlow:           false,
 			excludeStartedPreviously: false,
-			queue:                    tasks.HandlerQueue,
+			queue:                    rt.Queues.Realtime,
 			expectedContactCount:     1,
 			expectedBatchCount:       1,
 			expectedTotalCount:       1,
@@ -209,7 +206,7 @@ func TestStartFlowTask(t *testing.T) {
 	}
 
 	for i, tc := range tcs {
-		testsuite.ReindexElastic(ctx)
+		testsuite.ReindexElastic(t, rt)
 
 		// handle our start task
 		start := models.NewFlowStart(testdb.Org1.ID, models.StartTypeManual, tc.flowID).
@@ -221,11 +218,11 @@ func TestStartFlowTask(t *testing.T) {
 			WithExcludeStartedPreviously(tc.excludeStartedPreviously).
 			WithCreateContact(tc.createContact)
 
-		err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
+		err := models.InsertFlowStart(ctx, rt.DB, start)
 		assert.NoError(t, err, "%d: failed to insert start", i)
 
-		err = tasks.Queue(rc, tc.queue, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
-		assert.NoError(t, err)
+		err = tasks.Queue(ctx, rt, tc.queue, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
+		assert.NoError(t, err, "%d: failed to queue start task", i)
 
 		taskCounts := testsuite.FlushTasks(t, rt)
 
@@ -251,17 +248,15 @@ func TestStartFlowTask(t *testing.T) {
 }
 
 func TestStartFlowTaskNonPersistedStart(t *testing.T) {
-	_, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
 	// create a start and start it...
 	start := models.NewFlowStart(models.OrgID(1), models.StartTypeManual, testdb.SingleMessage.ID).
-		WithContactIDs([]models.ContactID{testdb.Cathy.ID, testdb.Bob.ID})
+		WithContactIDs([]models.ContactID{testdb.Ann.ID, testdb.Bob.ID})
 
-	err := tasks.Queue(rc, tasks.ThrottledQueue, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
+	err := tasks.Queue(ctx, rt, rt.Queues.Throttled, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
 	assert.NoError(t, err)
 	testsuite.FlushTasks(t, rt)
 

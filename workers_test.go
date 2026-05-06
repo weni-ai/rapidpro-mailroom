@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/utils/queues"
+	"github.com/nyaruka/vkutil/assertvk"
 )
 
 type testTask struct{}
@@ -25,38 +26,58 @@ func (t *testTask) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.
 }
 
 func TestForemanAndWorkers(t *testing.T) {
-	_, rt := testsuite.Runtime()
-	wg := &sync.WaitGroup{}
-	q := queues.NewFairSorted("test")
+	ctx, rt := testsuite.Runtime(t)
 
-	rc := rt.VK.Get()
-	defer rc.Close()
+	defer testsuite.Reset(t, rt, testsuite.ResetValkey)
+
+	wg := &sync.WaitGroup{}
+	q := queues.NewFair("test", 10)
+
+	vc := rt.VK.Get()
+	defer vc.Close()
 
 	tasks.RegisterType("test", func() tasks.Task { return &testTask{} })
 
 	// queue up tasks of unknown type to ensure it doesn't break further processing
-	q.Push(rc, "spam", 1, "argh", false)
-	q.Push(rc, "spam", 2, "argh", false)
+	q.Push(ctx, vc, "spam", 1, "argh", false)
+	q.Push(ctx, vc, "spam", 2, "argh", false)
 
 	// queue up 5 tasks for two orgs
 	for range 5 {
-		q.Push(rc, "test", 1, &testTask{}, false)
+		q.Push(ctx, vc, "test", 1, &testTask{}, false)
 	}
 	for range 5 {
-		q.Push(rc, "test", 2, &testTask{}, false)
+		q.Push(ctx, vc, "test", 2, &testTask{}, false)
 	}
 
-	fm := mailroom.NewForeman(rt, wg, q, 2)
-	fm.Start()
+	fm := mailroom.NewForeman(rt, q, 2)
+	fm.Start(wg)
 
 	// wait for queue to empty
 	for {
-		if size, err := q.Size(rc); err != nil || size == 0 {
+		if size, err := q.Size(ctx, vc); err != nil || size == 0 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
+	// give workers time to finish the last task and mark done
+	time.Sleep(150 * time.Millisecond)
+
+	assertvk.ZGetAll(t, vc, "{tasks:test}:queued", map[string]float64{})
+	assertvk.ZGetAll(t, vc, "{tasks:test}:active", map[string]float64{})
+
+	// queue more tasks and immediately stop the foreman
+	for range 10 {
+		q.Push(ctx, vc, "test", 1, &testTask{}, false)
+	}
+
+	// give workers time to pick up tasks
+	time.Sleep(300 * time.Millisecond)
+
 	fm.Stop()
+
 	wg.Wait()
+
+	assertvk.ZGetAll(t, vc, "{tasks:test}:active", map[string]float64{})
 }

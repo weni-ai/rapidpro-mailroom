@@ -19,116 +19,143 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
-	// detach Cathy's tel URN
-	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdb.Cathy.ID)
+	// detach Ann's tel URN
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdb.Ann.ID)
 
-	rt.DB.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
-
-	testsuite.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/create.json")
 }
 
 func TestDeindex(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetElastic)
+	defer testsuite.Reset(t, rt, testsuite.ResetElastic)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/deindex.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/deindex.json")
 }
 
 func TestExport(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/export.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/export.json")
 }
 
 func TestExportPreview(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/export_preview.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/export_preview.json")
+}
+
+func TestImport(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
+
+	import1ID := testdb.InsertContactImport(t, rt, testdb.Org1, models.ImportStatusProcessing, testdb.Admin)
+	testdb.InsertContactImportBatch(t, rt, import1ID, []byte(`[
+		{"name": "Norbert", "language": "eng", "urns": ["tel:+16055740001"]},
+		{"name": "Leah", "urns": ["tel:+16055740002"]}
+	]`))
+	testdb.InsertContactImportBatch(t, rt, import1ID, []byte(`[
+		{"name": "Rowan", "language": "spa", "urns": ["tel:+16055740003"]}
+	]`))
+	import2ID := testdb.InsertContactImport(t, rt, testdb.Org1, models.ImportStatusProcessing, testdb.Editor)
+	testdb.InsertContactImportBatch(t, rt, import2ID, []byte(`[
+		{"name": "Gloria", "urns": ["tel:+16055740003"]}
+	]`))
+
+	testsuite.RunWebTests(t, rt, "testdata/import.json")
 }
 
 func TestInspect(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	// give cathy an unsendable twitterid URN with a display value
-	testdb.InsertContactURN(rt, testdb.Org1, testdb.Cathy, urns.URN("twitterid:23145325#cathy"), 20000, nil)
+	// give Ann an unsendable twitterid URN with a display value
+	testdb.InsertContactURN(t, rt, testdb.Org1, testdb.Ann, urns.URN("twitterid:23145325#ann"), 20000, nil)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/inspect.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/inspect.json")
 }
 
 func TestModify(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 
-	// to be deterministic, update the creation date on cathy
-	rt.DB.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), testdb.Cathy.ID)
+	// to be deterministic, update the creation date on Ann
+	rt.DB.MustExec(`UPDATE contacts_contact SET created_on = $1 WHERE id = $2`, time.Date(2018, 7, 6, 12, 30, 0, 123456789, time.UTC), testdb.Ann.ID)
 
 	// make our campaign group dynamic
 	rt.DB.MustExec(`UPDATE contacts_contactgroup SET query = 'age > 18' WHERE id = $1`, testdb.DoctorsGroup.ID)
 
 	// insert an event on our campaign that is based on created on
-	testdb.InsertCampaignFlowPoint(rt, testdb.RemindersCampaign, testdb.Favorites, testdb.CreatedOnField, 1000, "W")
+	testdb.InsertCampaignFlowPoint(t, rt, testdb.RemindersCampaign, testdb.Favorites, testdb.CreatedOnField, 1000, "W")
 
-	// for simpler tests we clear out cathy's fields and groups to start
-	rt.DB.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, testdb.Cathy.ID)
-	rt.DB.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdb.Cathy.ID)
-	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdb.Cathy.ID)
+	// for simpler tests we clear out Ann's fields and groups to start
+	rt.DB.MustExec(`UPDATE contacts_contact SET fields = NULL WHERE id = $1`, testdb.Ann.ID)
+	rt.DB.MustExec(`DELETE FROM contacts_contactgroup_contacts WHERE contact_id = $1`, testdb.Ann.ID)
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdb.Ann.ID)
 
 	// because we made changes to a group above, need to make sure we don't use stale org assets
 	models.FlushCache()
 
 	// lock a contact to test skipping them
-	clocks.TryToLock(ctx, rt, oa, []models.ContactID{testdb.Alexandra.ID}, time.Second)
+	clocks.TryToLock(ctx, rt, oa, []models.ContactID{testdb.Dan.ID}, time.Second)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/modify.json")
 }
 
 func TestInterrupt(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
-	// give Cathy a completed and a waiting session
-	testdb.InsertFlowSession(rt, testdb.Cathy, models.FlowTypeMessaging, models.SessionStatusCompleted, testdb.Favorites, models.NilCallID)
-	testdb.InsertWaitingSession(rt, testdb.Org1, testdb.Cathy, models.FlowTypeMessaging, testdb.Favorites, models.NilCallID)
+	// give Ann a completed and a waiting session
+	testdb.InsertFlowSession(t, rt, testdb.Ann, models.FlowTypeMessaging, models.SessionStatusCompleted, nil, testdb.Favorites)
+	testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Ann, models.FlowTypeMessaging, nil, testdb.Favorites)
 
 	// give Bob a waiting session
-	testdb.InsertWaitingSession(rt, testdb.Org1, testdb.Bob, models.FlowTypeMessaging, testdb.PickANumber, models.NilCallID)
+	testdb.InsertWaitingSession(t, rt, testdb.Org1, testdb.Bob, models.FlowTypeMessaging, nil, testdb.PickANumber)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/interrupt.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/interrupt.json")
 }
 
 func TestParseQuery(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	testsuite.RunWebTests(t, rt, "testdata/parse_query.json")
+}
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/parse_query.json", nil)
+func TestPopulateGroup(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey|testsuite.ResetElastic)
+
+	testdb.InsertContactGroup(t, rt, testdb.Org1, "", "Dynamic", "age > 18")
+
+	testsuite.RunWebTests(t, rt, "testdata/populate_group.json")
 }
 
 func TestSearch(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/search.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/search.json")
 }
 
 func TestURNs(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/urns.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/urns.json")
 }
 
 func TestSpecToCreation(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
 	require.NoError(t, err)

@@ -8,69 +8,77 @@ import (
 	"github.com/nyaruka/mailroom/testsuite/testdb"
 )
 
-func TestTicketAssign(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+func TestTicketAddNote(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Admin)
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Agent)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, nil)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Bob, testdb.DefaultTopic, nil)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-717a-a39e-e8ca91fb7262", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Admin)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-725e-be9c-0c6407efd755", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Agent)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7498-a7f2-6aa246e45cfe", testdb.Org1, testdb.Ann, testdb.DefaultTopic, nil)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/assign.json", nil)
+	testdb.OpenTicketsGroup.Add(rt, testdb.Ann)
+
+	testsuite.RunWebTests(t, rt, "testdata/add_note.json")
 }
 
-func TestTicketAddNote(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+func TestTicketChangeAssignee(t *testing.T) {
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Admin)
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Agent)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, nil)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-717a-a39e-e8ca91fb7262", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Admin)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-725e-be9c-0c6407efd755", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Agent)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7498-a7f2-6aa246e45cfe", testdb.Org1, testdb.Ann, testdb.DefaultTopic, nil)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7658-a5d4-bdb05863ec56", testdb.Org1, testdb.Bob, testdb.DefaultTopic, nil)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/add_note.json", nil)
+	testdb.OpenTicketsGroup.Add(rt, testdb.Ann)
+
+	testsuite.RunWebTests(t, rt, "testdata/change_assignee.json")
 }
 
 func TestTicketChangeTopic(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData)
 
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Admin)
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.SupportTopic, time.Now(), testdb.Agent)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.SalesTopic, nil)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-717a-a39e-e8ca91fb7262", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Admin)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-725e-be9c-0c6407efd755", testdb.Org1, testdb.Ann, testdb.SupportTopic, time.Now(), testdb.Agent)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7498-a7f2-6aa246e45cfe", testdb.Org1, testdb.Ann, testdb.SalesTopic, nil)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/change_topic.json", nil)
+	testdb.OpenTicketsGroup.Add(rt, testdb.Ann)
+
+	testsuite.RunWebTests(t, rt, "testdata/change_topic.json")
 }
 
 func TestTicketClose(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
-	// create 2 open tickets and 1 closed one for Cathy
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), testdb.Admin)
-	testdb.InsertOpenTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, time.Now(), nil)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, testdb.Editor)
+	// create 2 open tickets and 1 closed one for Ann
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-717a-a39e-e8ca91fb7262", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), testdb.Admin)
+	testdb.InsertOpenTicket(t, rt, "01992f54-5ab6-725e-be9c-0c6407efd755", testdb.Org1, testdb.Ann, testdb.DefaultTopic, time.Now(), nil)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7498-a7f2-6aa246e45cfe", testdb.Org1, testdb.Ann, testdb.DefaultTopic, testdb.Editor)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/close.json", nil)
+	testdb.OpenTicketsGroup.Add(rt, testdb.Ann)
+
+	testsuite.RunWebTests(t, rt, "testdata/close.json")
 }
 
 func TestTicketReopen(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
-	// we should be able to reopen ticket #1 because Cathy has no other tickets open
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, testdb.Admin)
+	// we should be able to reopen ticket #1 because Ann has no other tickets open
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-717a-a39e-e8ca91fb7262", testdb.Org1, testdb.Ann, testdb.DefaultTopic, testdb.Admin)
 
 	// but then we won't be able to open ticket #2
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Cathy, testdb.DefaultTopic, nil)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-725e-be9c-0c6407efd755", testdb.Org1, testdb.Ann, testdb.DefaultTopic, nil)
 
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Bob, testdb.DefaultTopic, testdb.Editor)
-	testdb.InsertClosedTicket(rt, testdb.Org1, testdb.Alexandra, testdb.DefaultTopic, testdb.Editor)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7498-a7f2-6aa246e45cfe", testdb.Org1, testdb.Bob, testdb.DefaultTopic, testdb.Editor)
+	testdb.InsertClosedTicket(t, rt, "01992f54-5ab6-7658-a5d4-bdb05863ec56", testdb.Org1, testdb.Dan, testdb.DefaultTopic, testdb.Editor)
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/reopen.json", nil)
+	testsuite.RunWebTests(t, rt, "testdata/reopen.json")
 }

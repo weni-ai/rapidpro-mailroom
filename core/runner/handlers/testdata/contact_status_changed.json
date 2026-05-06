@@ -1,0 +1,128 @@
+[
+    {
+        "label": "#1",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b47-2c93-76f8-9654-8a7258fbaae4",
+                    "type": "contact_status_changed",
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "status": "blocked"
+                },
+                {
+                    "uuid": "01969b47-3463-76f8-8e78-3bde7b3370ae",
+                    "type": "contact_groups_changed",
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "groups_removed": [
+                        {
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638",
+                            "name": "Doctors"
+                        }
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'B'",
+                "args": [
+                    10000
+                ],
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-2c93-76f8-9654-8a7258fbaae4",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "status": "blocked",
+                    "type": "contact_status_changed"
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-3463-76f8-8e78-3bde7b3370ae",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:58Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "groups_removed": [
+                        {
+                            "name": "Doctors",
+                            "uuid": "c153e265-f7c9-4539-9dbc-9b358714b638"
+                        }
+                    ],
+                    "type": "contact_groups_changed"
+                }
+            }
+        ]
+    },
+    {
+        "label": "#2",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b48-0f23-76f8-8c15-15a7c0c5228d",
+                    "type": "contact_status_changed",
+                    "created_on": "2025-05-04T12:31:54.123456789Z",
+                    "status": "stopped"
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = $1 AND status = 'S'",
+                "args": [
+                    10000
+                ],
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-0f23-76f8-8c15-15a7c0c5228d",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:31:54.123456789Z",
+                    "status": "stopped",
+                    "type": "contact_status_changed"
+                }
+            }
+        ]
+    },
+    {
+        "label": "#3",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b48-e9e3-76f8-8742-c1eff0201012",
+                    "type": "contact_status_changed",
+                    "created_on": "2025-05-04T12:32:50.123456789Z",
+                    "status": "active"
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "SELECT count(*) FROM contacts_contact WHERE id = 10000 AND status = 'A'",
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b48-e9e3-76f8-8742-c1eff0201012",
+                "OrgID": 1,
+                "Data": {
+                    "created_on": "2025-05-04T12:32:50.123456789Z",
+                    "status": "active",
+                    "type": "contact_status_changed"
+                }
+            }
+        ]
+    }
+]

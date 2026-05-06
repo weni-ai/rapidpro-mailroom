@@ -5,44 +5,51 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/nyaruka/goflow/assets"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 )
 
 func init() {
-	web.RegisterRoute(http.MethodPost, "/mr/ticket/change_topic", web.RequireAuthToken(web.JSONPayload(handleChangeTopic)))
+	web.InternalRoute(http.MethodPost, "/ticket/change_topic", web.JSONPayload(handleChangeTopic))
 }
 
 type changeTopicRequest struct {
 	bulkTicketRequest
 
-	TopicID models.TopicID `json:"topic_id" validate:"required"`
+	TopicUUID assets.TopicUUID `json:"topic_uuid" validate:"required"`
 }
 
-// Changes the topic of the tickets with the given ids
+// Changes the topic of the specified tickets.
 //
 //	{
 //	  "org_id": 123,
 //	  "user_id": 234,
-//	  "ticket_ids": [1234, 2345],
-//	  "topic_id": 345
+//	  "ticket_uuids": ["01992f54-5ab6-717a-a39e-e8ca91fb7262", "01992f54-5ab6-725e-be9c-0c6407efd755"],
+//	  "topic_uuid": "7e39a04f-c7e9-4c1b-b9eb-7f3b4be5f183"
 //	}
 func handleChangeTopic(ctx context.Context, rt *runtime.Runtime, r *changeTopicRequest) (any, int, error) {
 	oa, err := models.GetOrgAssets(ctx, rt, r.OrgID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
+		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	tickets, err := models.LoadTickets(ctx, rt.DB, r.TicketIDs)
+	topic := oa.SessionAssets().Topics().Get(r.TopicUUID)
+	if topic == nil {
+		return nil, 0, fmt.Errorf("no such topic: %s", r.TopicUUID)
+	}
+
+	mod := func(t *models.Ticket) flows.Modifier {
+		return modifiers.NewTicketTopic(t.UUID, topic)
+	}
+
+	eventsByContact, err := modifyTickets(ctx, rt, oa, r.UserID, r.TicketUUIDs, mod)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error loading tickets for org: %d: %w", r.OrgID, err)
+		return nil, 0, fmt.Errorf("error changing ticket topic: %w", err)
 	}
 
-	evts, err := models.TicketsChangeTopic(ctx, rt.DB, oa, r.UserID, tickets, r.TopicID)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error changing topic of tickets: %w", err)
-	}
-
-	return newBulkResponse(evts), http.StatusOK, nil
+	return newBulkResponse(eventsByContact), http.StatusOK, nil
 }

@@ -4,18 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/utils/queues"
 )
-
-var HandlerQueue = queues.NewFairSorted("tasks:handler")
-var BatchQueue = queues.NewFairSorted("tasks:batch")
-var ThrottledQueue = queues.NewFairSorted("tasks:throttled")
 
 var registeredTypes = map[string](func() Task){}
 
@@ -53,12 +49,25 @@ func Perform(ctx context.Context, rt *runtime.Runtime, task *queues.Task) error 
 	ctx, cancel := context.WithTimeout(ctx, typedTask.Timeout())
 	defer cancel()
 
-	return typedTask.Perform(ctx, rt, oa)
+	start := time.Now()
+
+	err = typedTask.Perform(ctx, rt, oa)
+
+	// log if task took longer than 75% of its timeout
+	if duration := time.Since(start); duration >= (3 * typedTask.Timeout() / 4) {
+		slog.Error("task took longer than expected", "org", oa.OrgID(), "type", typedTask.Type(), "duration", duration, "limit", typedTask.Timeout())
+	}
+
+	return err
 }
 
 // Queue adds the given task to the given queue
-func Queue(rc redis.Conn, q queues.Fair, orgID models.OrgID, task Task, priority bool) error {
-	return q.Push(rc, task.Type(), int(orgID), task, priority)
+func Queue(ctx context.Context, rt *runtime.Runtime, q queues.Fair, orgID models.OrgID, task Task, priority bool) error {
+	vc := rt.VK.Get()
+	defer vc.Close()
+
+	_, err := q.Push(ctx, vc, task.Type(), int(orgID), task, priority)
+	return err
 }
 
 //------------------------------------------------------------------------------------------

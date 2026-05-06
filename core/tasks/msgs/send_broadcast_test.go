@@ -1,6 +1,7 @@
 package msgs_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -22,12 +23,9 @@ import (
 )
 
 func TestBroadcastsFromEvents(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	rc := rt.VK.Get()
-	defer rc.Close()
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
 	require.NoError(t, err)
@@ -42,15 +40,15 @@ func TestBroadcastsFromEvents(t *testing.T) {
 	}
 
 	doctors := assets.NewGroupReference(testdb.DoctorsGroup.UUID, "Doctors")
-	cathy := flows.NewContactReference(testdb.Cathy.UUID, "Cathy")
+	ann := flows.NewContactReference(testdb.Ann.UUID, "Ann")
 
-	// add an extra URN fo cathy
-	testdb.InsertContactURN(rt, testdb.Org1, testdb.Cathy, urns.URN("tel:+12065551212"), 1001, nil)
+	// add an extra URN fo Ann
+	testdb.InsertContactURN(t, rt, testdb.Org1, testdb.Ann, urns.URN("tel:+12065551212"), 1001, nil)
 
-	// change george's URN to an invalid twitter URN so it can't be sent
-	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdb.George.URNID)
-	george := flows.NewContactReference(testdb.George.UUID, "George")
-	georgeOnly := []*flows.ContactReference{george}
+	// change Cat's URN to an invalid twitter URN so it can't be sent
+	rt.DB.MustExec(`UPDATE contacts_contacturn SET identity = 'twitter:invalid-urn', scheme = 'twitter', path='invalid-urn' WHERE id = $1`, testdb.Cat.URNID)
+	cat := flows.NewContactReference(testdb.Cat.UUID, "Cat")
+	catOnly := []*flows.ContactReference{cat}
 
 	tcs := []struct {
 		translations       flows.BroadcastTranslations
@@ -69,7 +67,7 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			groups:             []*assets.GroupReference{doctors},
 			contacts:           nil,
 			urns:               nil,
-			queue:              tasks.BatchQueue,
+			queue:              rt.Queues.Batch,
 			expectedBatchCount: 2,
 			expectedMsgCount:   121,
 			expectedMsgText:    "hello world",
@@ -78,9 +76,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             []*assets.GroupReference{doctors},
-			contacts:           georgeOnly,
+			contacts:           catOnly,
 			urns:               nil,
-			queue:              tasks.BatchQueue,
+			queue:              rt.Queues.Batch,
 			expectedBatchCount: 2,
 			expectedMsgCount:   122,
 			expectedMsgText:    "hello world",
@@ -89,9 +87,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             nil,
-			contacts:           georgeOnly,
+			contacts:           catOnly,
 			urns:               nil,
-			queue:              tasks.HandlerQueue,
+			queue:              rt.Queues.Realtime,
 			expectedBatchCount: 1,
 			expectedMsgCount:   1,
 			expectedMsgText:    "hello world",
@@ -100,9 +98,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             []*assets.GroupReference{doctors},
-			contacts:           []*flows.ContactReference{cathy},
+			contacts:           []*flows.ContactReference{ann},
 			urns:               nil,
-			queue:              tasks.BatchQueue,
+			queue:              rt.Queues.Batch,
 			expectedBatchCount: 2,
 			expectedMsgCount:   121,
 			expectedMsgText:    "hello world",
@@ -111,9 +109,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             nil,
-			contacts:           []*flows.ContactReference{cathy},
+			contacts:           []*flows.ContactReference{ann},
 			urns:               nil,
-			queue:              tasks.HandlerQueue,
+			queue:              rt.Queues.Realtime,
 			expectedBatchCount: 1,
 			expectedMsgCount:   1,
 			expectedMsgText:    "hello world",
@@ -122,9 +120,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             nil,
-			contacts:           []*flows.ContactReference{cathy},
+			contacts:           []*flows.ContactReference{ann},
 			urns:               []urns.URN{urns.URN("tel:+12065551212")},
-			queue:              tasks.HandlerQueue,
+			queue:              rt.Queues.Realtime,
 			expectedBatchCount: 1,
 			expectedMsgCount:   1,
 			expectedMsgText:    "hello world",
@@ -133,9 +131,9 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			translations:       basic,
 			baseLanguage:       eng,
 			groups:             nil,
-			contacts:           []*flows.ContactReference{cathy},
+			contacts:           []*flows.ContactReference{ann},
 			urns:               []urns.URN{urns.URN("tel:+250700000001")},
-			queue:              tasks.HandlerQueue,
+			queue:              rt.Queues.Realtime,
 			expectedBatchCount: 1,
 			expectedMsgCount:   2,
 			expectedMsgText:    "hello world",
@@ -146,7 +144,7 @@ func TestBroadcastsFromEvents(t *testing.T) {
 			groups:             nil,
 			contacts:           nil,
 			urns:               []urns.URN{urns.URN("tel:+250700000001")},
-			queue:              tasks.HandlerQueue,
+			queue:              rt.Queues.Realtime,
 			expectedBatchCount: 1,
 			expectedMsgCount:   1,
 			expectedMsgText:    "hello world",
@@ -157,14 +155,14 @@ func TestBroadcastsFromEvents(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	for i, tc := range tcs {
-		testsuite.ReindexElastic(ctx)
+		testsuite.ReindexElastic(t, rt)
 
 		// handle our start task
 		event := events.NewBroadcastCreated(tc.translations, tc.baseLanguage, tc.groups, tc.contacts, "", tc.urns)
 		bcast, err := models.NewBroadcastFromEvent(ctx, rt.DB, oa, event)
 		assert.NoError(t, err)
 
-		err = tasks.Queue(rc, tc.queue, testdb.Org1.ID, &msgs.SendBroadcastTask{Broadcast: bcast}, false)
+		err = tasks.Queue(ctx, rt, tc.queue, testdb.Org1.ID, &msgs.SendBroadcastTask{Broadcast: bcast}, false)
 		assert.NoError(t, err)
 
 		taskCounts := testsuite.FlushTasks(t, rt)
@@ -182,25 +180,27 @@ func TestBroadcastsFromEvents(t *testing.T) {
 }
 
 func TestSendBroadcastTask(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
-	polls := testdb.InsertOptIn(rt, testdb.Org1, "Polls")
+	// add an "Polls" optin and opt-in Bob
+	polls := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Polls")
+	rt.DB.MustExec(fmt.Sprintf("UPDATE contacts_contacturn SET auth_tokens = '{\"optin:%d\": \"OPTIN1234\"}' WHERE contact_id = $1", polls.ID), testdb.Bob.ID)
 
 	rt.DB.MustExec(`UPDATE orgs_org SET flow_languages = '{"eng", "spa"}' WHERE id = $1`, testdb.Org1.ID)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshOrg|models.RefreshOptIns)
 	assert.NoError(t, err)
 
-	// add an extra URN for Cathy, change George's language to Spanish, and mark Bob as seen recently
-	testdb.InsertContactURN(rt, testdb.Org1, testdb.Cathy, urns.URN("tel:+12065551212"), 1001, nil)
-	rt.DB.MustExec(`UPDATE contacts_contact SET language = 'spa', modified_on = NOW() WHERE id = $1`, testdb.George.ID)
+	// add an extra URN for Ann, change Cat's language to Spanish, and mark Bob as seen recently
+	testdb.InsertContactURN(t, rt, testdb.Org1, testdb.Ann, urns.URN("tel:+12065551212"), 1001, nil)
+	rt.DB.MustExec(`UPDATE contacts_contact SET language = 'spa', modified_on = NOW() WHERE id = $1`, testdb.Cat.ID)
 	rt.DB.MustExec(`UPDATE contacts_contact SET last_seen_on = NOW() - interval '45 days', modified_on = NOW() WHERE id = $1`, testdb.Bob.ID)
 
-	testsuite.ReindexElastic(ctx)
+	testsuite.ReindexElastic(t, rt)
 
 	tcs := []struct {
 		translations    flows.BroadcastTranslations
@@ -225,12 +225,12 @@ func TestSendBroadcastTask(t *testing.T) {
 			expressions:     false,
 			optIn:           polls,
 			groupIDs:        []models.GroupID{testdb.DoctorsGroup.ID},
-			contactIDs:      []models.ContactID{testdb.Cathy.ID},
+			contactIDs:      []models.ContactID{testdb.Ann.ID, testdb.Bob.ID},
 			exclusions:      models.NoExclusions,
 			createdByID:     testdb.Admin.ID,
-			queue:           tasks.BatchQueue,
+			queue:           rt.Queues.Batch,
 			expectedBatches: 2,
-			expectedMsgs:    map[string]int{"hello world": 121},
+			expectedMsgs:    map[string]int{"hello world": 122},
 		},
 		{
 			translations: flows.BroadcastTranslations{
@@ -238,12 +238,12 @@ func TestSendBroadcastTask(t *testing.T) {
 			},
 			baseLanguage:    "eng",
 			expressions:     true,
-			contactIDs:      []models.ContactID{testdb.Cathy.ID},
+			contactIDs:      []models.ContactID{testdb.Ann.ID},
 			exclusions:      models.NoExclusions,
 			createdByID:     testdb.Agent.ID,
-			queue:           tasks.HandlerQueue,
+			queue:           rt.Queues.Realtime,
 			expectedBatches: 1,
-			expectedMsgs:    map[string]int{"hi Cathy from TextIt goflow URN: tel:+12065551212 Gender: F": 1},
+			expectedMsgs:    map[string]int{"hi Ann from TextIt goflow URN: tel:+12065551212 Gender: F": 1},
 		},
 		{
 			translations: flows.BroadcastTranslations{
@@ -252,9 +252,9 @@ func TestSendBroadcastTask(t *testing.T) {
 			},
 			baseLanguage:    "eng",
 			expressions:     true,
-			query:           "name = Cathy OR name = George OR name = Bob",
+			query:           "name = Ann OR name = Cat OR name = Bob",
 			exclusions:      models.NoExclusions,
-			queue:           tasks.BatchQueue,
+			queue:           rt.Queues.Batch,
 			expectedBatches: 1,
 			expectedMsgs:    map[string]int{"hello": 2, "hola": 1},
 		},
@@ -265,9 +265,9 @@ func TestSendBroadcastTask(t *testing.T) {
 			},
 			baseLanguage:    "eng",
 			expressions:     true,
-			query:           "name = Cathy OR name = George OR name = Bob",
+			query:           "name = Ann OR name = Cat OR name = Bob",
 			exclusions:      models.Exclusions{NotSeenSinceDays: 60},
-			queue:           tasks.BatchQueue,
+			queue:           rt.Queues.Batch,
 			expectedBatches: 1,
 			expectedMsgs:    map[string]int{"goodbye": 1},
 		},
@@ -288,7 +288,7 @@ func TestSendBroadcastTask(t *testing.T) {
 
 		task := &msgs.SendBroadcastTask{Broadcast: bcast}
 
-		err = tasks.Queue(rc, tasks.BatchQueue, testdb.Org1.ID, task, false)
+		err = tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, task, false)
 		assert.NoError(t, err)
 
 		taskCounts := testsuite.FlushTasks(t, rt)

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/vinovest/sqlx"
 )
 
 type WebhookCall struct {
@@ -21,13 +21,13 @@ var MonitorWebhooks runner.PreCommitHook = &monitorWebhooks{}
 
 type monitorWebhooks struct{}
 
-func (h *monitorWebhooks) Order() int { return 1 }
+func (h *monitorWebhooks) Order() int { return 10 }
 
 func (h *monitorWebhooks) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
 	// organize events by nodes
 	eventsByNode := make(map[flows.NodeUUID][]*events.WebhookCalled)
-	for _, es := range scenes {
-		for _, e := range es {
+	for _, args := range scenes {
+		for _, e := range args {
 			wc := e.(*WebhookCall)
 			eventsByNode[wc.NodeUUID] = append(eventsByNode[wc.NodeUUID], wc.Event)
 		}

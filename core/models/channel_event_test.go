@@ -14,7 +14,7 @@ import (
 )
 
 func TestChannelEvents(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
+	ctx, rt := testsuite.Runtime(t)
 
 	defer rt.DB.MustExec(`DELETE FROM channels_channelevent`)
 
@@ -23,8 +23,8 @@ func TestChannelEvents(t *testing.T) {
 		testdb.Org1.ID,
 		models.EventTypeIncomingCall,
 		testdb.TwilioChannel.ID,
-		testdb.Cathy.ID,
-		testdb.Cathy.URNID,
+		testdb.Ann.ID,
+		testdb.Ann.URNID,
 		models.EventStatusHandled,
 		nil,
 		time.Date(2024, 4, 1, 15, 13, 45, 0, time.UTC),
@@ -44,8 +44,8 @@ func TestChannelEvents(t *testing.T) {
 		testdb.Org1.ID,
 		models.EventTypeMissedCall,
 		testdb.TwilioChannel.ID,
-		testdb.Cathy.ID,
-		testdb.Cathy.URNID,
+		testdb.Ann.ID,
+		testdb.Ann.URNID,
 		models.EventStatusPending,
 		map[string]any{"duration": 123},
 		time.Date(2024, 4, 1, 15, 13, 45, 0, time.UTC),
@@ -58,7 +58,7 @@ func TestChannelEvents(t *testing.T) {
 
 	assertdb.Query(t, rt.DB, `SELECT event_type, status FROM channels_channelevent WHERE id = $1`, e2.ID).Columns(map[string]any{"event_type": "mo_miss", "status": "P"})
 
-	models.MarkChannelEventHandled(ctx, rt.DB, e2.ID)
+	models.MarkChannelEventHandled(ctx, rt.DB, e2.UUID)
 
 	assertdb.Query(t, rt.DB, `SELECT event_type, status FROM channels_channelevent WHERE id = $1`, e2.ID).Columns(map[string]any{"event_type": "mo_miss", "status": "H"})
 

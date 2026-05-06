@@ -56,7 +56,7 @@ func buildDialResume(resume DialResume) (flows.Resume, error, error) {
 	return resumes.NewDial(events.NewDialEnded(flows.NewDial(resume.Status, resume.Duration))), nil, nil
 }
 
-func buildMsgResume(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, svc Service, channel *models.Channel, urn urns.URN, call *models.Call, resume InputResume) (*models.MsgInRef, flows.Resume, error, error) {
+func buildMsgResume(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, svc Service, channel *models.Channel, urn urns.URN, call *models.Call, flow *models.Flow, resume InputResume) (*models.MsgInRef, flows.Resume, error, error) {
 	// our msg UUID
 	msgUUID := flows.NewEventUUID()
 
@@ -100,16 +100,20 @@ func buildMsgResume(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 		attachments = []utils.Attachment{resume.Attachment}
 	}
 
-	// create and insert an incoming message
 	msgIn := flows.NewMsgIn(urn, channel.Reference(), resume.Input, attachments, "")
 	msgEvt := events.NewMsgReceived(msgIn)
 	msgEvt.UUID_ = msgUUID
 
-	msg := models.NewIncomingIVR(rt.Config, oa.OrgID(), call, msgEvt)
+	// we currently model timeouts as empty messages.. if we have one of those, don't save it
+	if resume.Input == "" && len(attachments) == 0 {
+		return nil, resumes.NewMsg(msgEvt), nil, nil
+	}
+
+	msg := models.NewIncomingIVR(rt.Config, oa.OrgID(), call, flow, msgEvt)
 	if err := models.InsertMessages(ctx, rt.DB, []*models.Msg{msg}); err != nil {
 		return nil, nil, nil, fmt.Errorf("error committing new message: %w", err)
 	}
 
 	// create our msg resume event
-	return &models.MsgInRef{ID: msg.ID()}, resumes.NewMsg(msgEvt), nil, nil
+	return &models.MsgInRef{UUID: msg.UUID(), Handled: true}, resumes.NewMsg(msgEvt), nil, nil
 }

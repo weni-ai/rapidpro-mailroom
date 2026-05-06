@@ -14,30 +14,30 @@ import (
 )
 
 func TestFireSchedules(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetValkey)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetValkey)
 
 	// add a one-time schedule and tie a broadcast to it
-	s1 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-2*time.Hour))
-	b1 := testdb.InsertBroadcast(rt, testdb.Org1, "eng", map[i18n.Language]string{"eng": "Hi", "spa": "Hola"}, nil, s1, []*testdb.Contact{testdb.Cathy, testdb.George}, nil)
+	s1 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-2*time.Hour))
+	b1 := testdb.InsertBroadcast(t, rt, testdb.Org1, "0199877e-0ed2-790b-b474-35099cea401c", "eng", map[i18n.Language]string{"eng": "Hi", "spa": "Hola"}, nil, s1, []*testdb.Contact{testdb.Ann, testdb.Cat}, nil)
 
 	// add a repeating schedule and tie another broadcast to it
-	s2 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
-	b2 := testdb.InsertBroadcast(rt, testdb.Org1, "eng", map[i18n.Language]string{"eng": "Bye", "spa": "Chau"}, nil, s2, nil, []*testdb.Group{testdb.DoctorsGroup})
+	s2 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
+	b2 := testdb.InsertBroadcast(t, rt, testdb.Org1, "01998781-12e7-75ff-b276-404730892c3d", "eng", map[i18n.Language]string{"eng": "Bye", "spa": "Chau"}, nil, s2, nil, []*testdb.Group{testdb.DoctorsGroup})
 
 	// add a one-time schedule and tie a trigger to it
-	s3 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-2*time.Hour))
-	t1 := testdb.InsertScheduledTrigger(rt, testdb.Org1, testdb.Favorites, s3, nil, nil, []*testdb.Contact{testdb.Cathy, testdb.George})
+	s3 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodNever, time.Now().Add(-2*time.Hour))
+	t1 := testdb.InsertScheduledTrigger(t, rt, testdb.Org1, testdb.Favorites, s3, nil, nil, []*testdb.Contact{testdb.Ann, testdb.Cat})
 
 	// add a repeating schedule and tie another trigger to it
-	s4 := testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
-	testdb.InsertScheduledTrigger(rt, testdb.Org1, testdb.Favorites, s4, []*testdb.Group{testdb.DoctorsGroup}, nil, nil)
+	s4 := testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
+	testdb.InsertScheduledTrigger(t, rt, testdb.Org1, testdb.Favorites, s4, []*testdb.Group{testdb.DoctorsGroup}, nil, nil)
 
 	// add a repeating orphaned schedule
-	testdb.InsertSchedule(rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
+	testdb.InsertSchedule(t, rt, testdb.Org1, models.RepeatPeriodDaily, time.Now().Add(-time.Hour))
 
 	// run our task
 	cron := &crons.FireSchedulesCron{}
@@ -49,8 +49,8 @@ func TestFireSchedules(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM flows_flowstart WHERE flow_id = $1 AND start_type = 'T' AND status = 'P'`, testdb.Favorites.ID).Returns(2)
 
 	// with the right counts of groups and contacts
-	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 1`).Returns(2)
-	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 2`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowstart_contacts WHERE flowstart_id = 30000`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from flows_flowstart_groups WHERE flowstart_id = 30001`).Returns(1)
 
 	// and two child broadcasts as well
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 
@@ -58,22 +58,22 @@ func TestFireSchedules(t *testing.T) {
 		AND translations -> 'eng' ->> 'text' = 'Hi'
 		AND translations -> 'spa' ->> 'text' = 'Hola'
 		AND status = 'P' 
-		AND base_language = 'eng'`, testdb.Org1.ID, b1).Returns(1)
+		AND base_language = 'eng'`, testdb.Org1.ID, b1.ID).Returns(1)
 
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM msgs_broadcast WHERE org_id = $1 
 		AND parent_id = $2 
 		AND translations -> 'eng' ->> 'text' = 'Bye'
 		AND translations -> 'spa' ->> 'text' = 'Chau'
 		AND status = 'P' 
-		AND base_language = 'eng'`, testdb.Org1.ID, b2).Returns(1)
+		AND base_language = 'eng'`, testdb.Org1.ID, b2.ID).Returns(1)
 
 	// with the right count of contacts and groups
-	assertdb.Query(t, rt.DB, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 3`).Returns(2)
-	assertdb.Query(t, rt.DB, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 4`).Returns(1)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from msgs_broadcast_contacts WHERE broadcast_id = 30000`).Returns(2)
+	assertdb.Query(t, rt.DB, `SELECT count(*) from msgs_broadcast_groups WHERE broadcast_id = 30001`).Returns(1)
 
 	// the one-off schedules should de deleted and their broadcast and trigger deactivated
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM schedules_schedule WHERE id = $1`, s1).Returns(0)
-	assertdb.Query(t, rt.DB, `SELECT is_active FROM msgs_broadcast WHERE id = $1`, b1).Returns(false)
+	assertdb.Query(t, rt.DB, `SELECT is_active FROM msgs_broadcast WHERE id = $1`, b1.ID).Returns(false)
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM schedules_schedule WHERE id = $1`, s3).Returns(0)
 	assertdb.Query(t, rt.DB, `SELECT is_active FROM triggers_trigger WHERE id = $1`, t1).Returns(false)
 
@@ -82,5 +82,5 @@ func TestFireSchedules(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM schedules_schedule WHERE id = $1 AND next_fire > NOW() AND last_fire < NOW()`, s4).Returns(1)
 
 	// check the tasks created
-	testsuite.AssertBatchTasks(t, testdb.Org1.ID, map[string]int{"start_flow": 2, "send_broadcast": 2})
+	testsuite.AssertBatchTasks(t, rt, testdb.Org1.ID, map[string]int{"start_flow": 2, "send_broadcast": 2})
 }

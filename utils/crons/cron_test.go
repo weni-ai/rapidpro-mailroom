@@ -13,9 +13,9 @@ import (
 )
 
 func TestCron(t *testing.T) {
-	_, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	_, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
 
 	align := func() {
 		untilNextSecond := time.Nanosecond * time.Duration(1_000_000_000-time.Now().Nanosecond()) // time until next second boundary

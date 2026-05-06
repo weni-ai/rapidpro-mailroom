@@ -10,7 +10,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 )
 
-type JSONHandler[T any] func(ctx context.Context, rt *runtime.Runtime, request *T) (any, int, error)
+type JSONHandler[T any] func(context.Context, *runtime.Runtime, *T) (any, int, error)
 
 func JSONPayload[T any](handler JSONHandler[T]) Handler {
 	return MarshaledResponse(func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error) {
@@ -24,7 +24,7 @@ func JSONPayload[T any](handler JSONHandler[T]) Handler {
 	})
 }
 
-type MarshaledHandler func(ctx context.Context, rt *runtime.Runtime, r *http.Request) (any, int, error)
+type MarshaledHandler func(context.Context, *runtime.Runtime, *http.Request) (any, int, error)
 
 // MarshaledResponse wraps a handler to change the signature so that the return value is marshaled as the response
 func MarshaledResponse(handler MarshaledHandler) Handler {
@@ -44,8 +44,8 @@ func MarshaledResponse(handler MarshaledHandler) Handler {
 	}
 }
 
-// RequireAuthToken wraps a handler to require that our request to have our global authorization header
-func RequireAuthToken(handler Handler) Handler {
+// wraps a handler to require that our request to have our global authorization header
+func requireAuthToken(handler Handler) Handler {
 	return func(ctx context.Context, rt *runtime.Runtime, r *http.Request, w http.ResponseWriter) error {
 		auth := r.Header.Get("authorization")
 

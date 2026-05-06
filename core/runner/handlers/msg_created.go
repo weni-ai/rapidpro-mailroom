@@ -21,11 +21,6 @@ func init() {
 func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scene *runner.Scene, e flows.Event, userID models.UserID) error {
 	event := e.(*events.MsgCreated)
 
-	// must be in a session
-	if scene.Session == nil {
-		return fmt.Errorf("cannot handle msg created event without session")
-	}
-
 	slog.Debug("msg created", "contact", scene.ContactUUID(), "session", scene.SessionUUID(), "text", event.Msg.Text(), "urn", event.Msg.URN())
 
 	// get our channel
@@ -37,10 +32,18 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAs
 		}
 	}
 
-	// and the flow
-	flow, _ := scene.LocateEvent(e)
+	var msg *models.MsgOut
+	var err error
 
-	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Contact, flow, event, scene.IncomingMsg)
+	if event.BroadcastUUID != "" {
+		msg, err = models.NewOutgoingBroadcastMsg(rt, oa.Org(), channel, scene.DBContact, event, scene.Broadcast)
+	} else if userID != models.NilUserID {
+		msg, err = models.NewOutgoingChatMsg(rt, oa.Org(), channel, scene.DBContact, event, userID)
+	} else {
+		flow := e.Step().Run().Flow().Asset().(*models.Flow)
+
+		msg, err = models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.DBContact, flow, event, scene.IncomingMsg)
+	}
 	if err != nil {
 		return fmt.Errorf("error creating outgoing message to %s: %w", event.Msg.URN(), err)
 	}
@@ -49,7 +52,11 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAs
 	scene.AttachPreCommitHook(hooks.InsertMessages, hooks.MsgAndURN{Msg: msg.Msg, URN: event.Msg.URN()})
 
 	// and queue it to be sent after the transaction is complete
-	scene.AttachPostCommitHook(hooks.SendMessages, msg)
+	if event.Msg.UnsendableReason() == "" {
+		scene.AttachPostCommitHook(hooks.SendMessages, msg)
+	}
+
+	scene.OutgoingMsgs = append(scene.OutgoingMsgs, msg)
 
 	return nil
 }

@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
+	"github.com/vinovest/sqlx"
 )
 
 // GroupID is our type for group ids
@@ -21,6 +21,7 @@ const (
 	GroupStatusInitializing = GroupStatus("I")
 	GroupStatusEvaluating   = GroupStatus("V")
 	GroupStatusReady        = GroupStatus("R")
+	GroupStatusInvalid      = GroupStatus("X")
 )
 
 // GroupType is the the type of a group
@@ -80,7 +81,7 @@ const sqlSelectGroupsByOrg = `
 SELECT ROW_TO_JSON(r) FROM (
       SELECT id, uuid, name, query, status, group_type
         FROM contacts_contactgroup 
-       WHERE org_id = $1 AND is_active = TRUE
+       WHERE org_id = $1 AND is_active = TRUE AND status != 'X'
     ORDER BY name ASC
 ) r;`
 
@@ -96,20 +97,12 @@ type GroupRemove struct {
 }
 
 const removeContactsFromGroupsSQL = `
-DELETE FROM
-	contacts_contactgroup_contacts
-WHERE 
-	id
-IN (
-	SELECT 
-		c.id 
-	FROM 
-		contacts_contactgroup_contacts c,
-		(VALUES(:contact_id, :group_id)) AS g(contact_id, group_id)
-	WHERE
-		c.contact_id = g.contact_id::int AND c.contactgroup_id = g.group_id::int
-);
-`
+DELETE FROM contacts_contactgroup_contacts
+WHERE id IN (
+	SELECT c.id 
+	FROM contacts_contactgroup_contacts c, (VALUES(:contact_id::int, :group_id::int)) AS g(contact_id, group_id)
+	WHERE c.contact_id = g.contact_id AND c.contactgroup_id = g.group_id
+);`
 
 // AddContactsToGroups fires a bulk SQL query to remove all the contacts in the passed in groups
 func AddContactsToGroups(ctx context.Context, tx DBorTx, adds []*GroupAdd) error {

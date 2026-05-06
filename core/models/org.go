@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -86,10 +87,25 @@ type Org struct {
 		FlowSMTP        null.String   `json:"flow_smtp"`
 		PrometheusToken null.String   `json:"prometheus_token"`
 		Config          null.Map[any] `json:"config"`
-		OutboxCount     int           `json:"outbox_count"`
 	}
 	env envs.Environment
 }
+
+// Environment adds values from config
+type Environment struct {
+	envs.Environment
+
+	obfuscationKey [4]uint32
+}
+
+func newEnvironment(base envs.Environment, cfg *runtime.Config) envs.Environment {
+	return &Environment{
+		Environment:    base,
+		obfuscationKey: cfg.IDObfuscationKeyParsed,
+	}
+}
+
+func (e *Environment) ObfuscationKey() [4]uint32 { return e.obfuscationKey }
 
 // ID returns the id of the org
 func (o *Org) ID() OrgID { return o.o.ID }
@@ -109,8 +125,6 @@ func (o *Org) PrometheusToken() string { return string(o.o.PrometheusToken) }
 // Environment returns this org as an engine environment
 func (o *Org) Environment() envs.Environment { return o.env }
 
-func (o *Org) OutboxCount() int { return o.o.OutboxCount }
-
 // MarshalJSON is our custom marshaller so that our inner env get output
 func (o *Org) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.env)
@@ -127,6 +141,7 @@ func (o *Org) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -244,15 +259,14 @@ SELECT ROW_TO_JSON(o) FROM (SELECT
 			WHERE c.org_id = o.id AND c.is_active = TRUE AND c.country IS NOT NULL
 			GROUP BY c.country ORDER BY count(c.country) desc, country LIMIT 1
 	    ), ''
-	) AS default_country,
-	(SELECT SUM(count) FROM orgs_itemcount WHERE org_id = $1 AND scope = 'msgs:folder:O') AS outbox_count
+	) AS default_country
 	FROM orgs_org o
 	WHERE id = $1
 ) o`
 
 // LoadOrg loads the org for the passed in id, returning any error encountered
-func LoadOrg(ctx context.Context, db *sql.DB, orgID OrgID) (*Org, error) {
-	org := &Org{}
+func LoadOrg(ctx context.Context, cfg *runtime.Config, db *sql.DB, orgID OrgID) (*Org, error) {
+	o := &Org{}
 	rows, err := db.QueryContext(ctx, sqlSelectOrgByID, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("error loading org: %d: %w", orgID, err)
@@ -262,12 +276,12 @@ func LoadOrg(ctx context.Context, db *sql.DB, orgID OrgID) (*Org, error) {
 		return nil, fmt.Errorf("no org with id: %d", orgID)
 	}
 
-	err = dbutil.ScanJSON(rows, org)
-	if err != nil {
+	if err := dbutil.ScanJSON(rows, o); err != nil {
 		return nil, fmt.Errorf("error unmarshalling org: %w", err)
 	}
 
-	return org, nil
+	o.env = newEnvironment(o.env, cfg)
+	return o, nil
 }
 
 // GetOrgIDFromUUID gets an org ID from a UUID (returns NilOrgID if not found)
@@ -279,4 +293,29 @@ func GetOrgIDFromUUID(ctx context.Context, db *sql.DB, orgUUID OrgUUID) (OrgID, 
 	}
 
 	return orgID, nil
+}
+
+const sqlSelectOutboxCounts = `
+  SELECT org_id, SUM(count) 
+    FROM orgs_itemcount 
+   WHERE org_id = ANY($1) AND scope = 'msgs:folder:O' 
+GROUP BY org_id, scope`
+
+// GetOutboxCounts returns a map of org IDs to their outbox counts
+func GetOutboxCounts(ctx context.Context, db *sql.DB, orgIDs []OrgID) (map[OrgID]int, error) {
+	counts := make(map[OrgID]int)
+	if len(orgIDs) == 0 {
+		return counts, nil
+	}
+
+	rows, err := db.QueryContext(ctx, sqlSelectOutboxCounts, pq.Array(orgIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if err := dbutil.ScanAllMap(rows, counts); err != nil {
+		return nil, err
+	}
+	return counts, nil
 }

@@ -1,0 +1,89 @@
+[
+    {
+        "label": "#1",
+        "events": {
+            "a393abc0-283d-4c9b-a1b3-641a035c34bf": [
+                {
+                    "uuid": "01969b47-2c93-76f8-bec9-e032f4f9af5f",
+                    "type": "contact_urns_changed",
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "urns": [
+                        "tel:+16055741111",
+                        "tel:+12065551212"
+                    ]
+                },
+                {
+                    "uuid": "01969b47-3463-76f8-9853-0310d032b497",
+                    "type": "contact_urns_changed",
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "urns": [
+                        "tel:+16055741111",
+                        "tel:+12065551212",
+                        "telegram:11551"
+                    ]
+                }
+            ]
+        },
+        "db_assertions": [
+            {
+                "query": "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'telegram' and path = '11551' and priority = 998",
+                "args": [
+                    10000
+                ],
+                "returns": 1
+            },
+            {
+                "query": "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+12065551212' and priority = 999 and identity = 'tel:+12065551212'",
+                "args": [
+                    10000
+                ],
+                "returns": 1
+            },
+            {
+                "query": "select count(*) from contacts_contacturn where contact_id = $1 and scheme = 'tel' and path = '+16055741111' and priority = 1000",
+                "args": [
+                    10000
+                ],
+                "returns": 1
+            },
+            {
+                "query": "select count(*) from contacts_contacturn where contact_id = $1",
+                "args": [
+                    10002
+                ],
+                "returns": 1
+            }
+        ],
+        "expected_history": [
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-2c93-76f8-bec9-e032f4f9af5f",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:56Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:56.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+16055741111",
+                        "tel:+12065551212"
+                    ]
+                }
+            },
+            {
+                "PK": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf",
+                "SK": "evt#01969b47-3463-76f8-9853-0310d032b497",
+                "OrgID": 1,
+                "TTL": "2026-05-04T12:30:58Z",
+                "Data": {
+                    "created_on": "2025-05-04T12:30:58.123456789Z",
+                    "type": "contact_urns_changed",
+                    "urns": [
+                        "tel:+16055741111",
+                        "tel:+12065551212",
+                        "telegram:11551"
+                    ]
+                }
+            }
+        ]
+    }
+]

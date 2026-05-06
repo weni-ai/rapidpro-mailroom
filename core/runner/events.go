@@ -26,6 +26,22 @@ func RegisterEventHandler(eventType string, handler EventHandler) {
 	eventHandlers[eventType] = handler
 }
 
+// TypeContactInterrupted is a pseudo event that lets add hooks for session interruption
+const TypeContactInterrupted string = "contact_interrupted"
+
+type ContactInterruptedEvent struct {
+	events.BaseEvent
+
+	Status flows.SessionStatus
+}
+
+func newContactInterruptedEvent(status flows.SessionStatus) *ContactInterruptedEvent {
+	return &ContactInterruptedEvent{
+		BaseEvent: events.NewBaseEvent(TypeContactInterrupted),
+		Status:    status,
+	}
+}
+
 // TypeSprintEnded is a pseudo event that lets add hooks for changes to a contacts current flow or flow history
 const TypeSprintEnded string = "sprint_ended"
 

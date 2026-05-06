@@ -42,6 +42,12 @@ const (
 	MsgOriginChat      MsgOrigin = "chat"
 )
 
+type Contact struct {
+	ID         models.ContactID  `json:"id"`
+	UUID       flows.ContactUUID `json:"uuid"`
+	LastSeenOn *time.Time        `json:"last_seen_on,omitempty"`
+}
+
 type OptInRef struct {
 	ID   models.OptInID `json:"id"`
 	Name string         `json:"name"`
@@ -70,9 +76,9 @@ var sessionStatusMap = map[flows.SessionStatus]string{flows.SessionStatusWaiting
 
 // Msg is the format of a message queued to courier
 type Msg struct {
-	ID                   models.MsgID       `json:"id"`
 	UUID                 flows.EventUUID    `json:"uuid"`
 	OrgID                models.OrgID       `json:"org_id"`
+	Contact              *Contact           `json:"contact"`
 	Origin               MsgOrigin          `json:"origin"`
 	Text                 string             `json:"text"`
 	Attachments          []utils.Attachment `json:"attachments,omitempty"`
@@ -83,8 +89,6 @@ type Msg struct {
 	MsgCount             int                `json:"tps_cost"`
 	CreatedOn            time.Time          `json:"created_on"`
 	ChannelUUID          assets.ChannelUUID `json:"channel_uuid"`
-	ContactID            models.ContactID   `json:"contact_id"`
-	ContactURNID         models.URNID       `json:"contact_urn_id"`
 	URN                  urns.URN           `json:"urn"`
 	URNAuth              string             `json:"urn_auth,omitempty"`
 	Flow                 *FlowRef           `json:"flow,omitempty"`
@@ -92,31 +96,33 @@ type Msg struct {
 	OptIn                *OptInRef          `json:"optin,omitempty"`
 	ResponseToExternalID string             `json:"response_to_external_id,omitempty"`
 	IsResend             bool               `json:"is_resend,omitempty"`
-
-	ContactLastSeenOn *time.Time `json:"contact_last_seen_on,omitempty"`
-	Session           *Session   `json:"session,omitempty"`
+	PrevAttempts         int                `json:"prev_attempts,omitempty"`
+	Session              *Session           `json:"session,omitempty"`
 }
 
 // NewCourierMsg creates a courier message in the format it's expecting to be queued
 func NewCourierMsg(oa *models.OrgAssets, mo *models.MsgOut, ch *models.Channel) (*Msg, error) {
 	msg := &Msg{
-		ID:           mo.ID(),
-		UUID:         mo.UUID(),
-		OrgID:        mo.OrgID(),
+		UUID:  mo.UUID(),
+		OrgID: mo.OrgID(),
+		Contact: &Contact{
+			ID:         mo.ContactID(),
+			UUID:       mo.Contact.UUID(),
+			LastSeenOn: mo.Contact.LastSeenOn(),
+		},
 		Text:         mo.Text(),
 		Attachments:  mo.Attachments(),
 		QuickReplies: mo.QuickReplies(),
 		Locale:       mo.Locale(),
 		HighPriority: mo.HighPriority(),
 		MsgCount:     mo.MsgCount(),
-		CreatedOn:    mo.CreatedOn(),
-		ContactID:    mo.ContactID(),
-		ContactURNID: mo.ContactURNID(),
+		CreatedOn:    mo.CreatedOn().In(time.UTC),
 		ChannelUUID:  ch.UUID(),
 		UserID:       mo.CreatedByID(),
 		URN:          mo.URN.Identity,
 		URNAuth:      string(mo.URN.AuthTokens["default"]),
 		IsResend:     mo.IsResend,
+		PrevAttempts: mo.ErrorCount(),
 	}
 
 	if mo.FlowID() != models.NilFlowID {
@@ -127,7 +133,7 @@ func NewCourierMsg(oa *models.OrgAssets, mo *models.MsgOut, ch *models.Channel) 
 		}
 	} else if mo.BroadcastID() != models.NilBroadcastID {
 		msg.Origin = MsgOriginBroadcast
-	} else if mo.TicketID() != models.NilTicketID {
+	} else if mo.TicketUUID() != "" {
 		msg.Origin = MsgOriginTicket
 	} else {
 		msg.Origin = MsgOriginChat
@@ -161,9 +167,6 @@ func NewCourierMsg(oa *models.OrgAssets, mo *models.MsgOut, ch *models.Channel) 
 
 	if mo.ReplyTo != nil {
 		msg.ResponseToExternalID = mo.ReplyTo.ExtID
-	}
-	if mo.Contact != nil && mo.Contact.LastSeenOn() != nil {
-		msg.ContactLastSeenOn = mo.Contact.LastSeenOn()
 	}
 	if mo.Session != nil {
 		msg.Session = &Session{
@@ -213,7 +216,7 @@ end
 `)
 
 // PushCourierBatch pushes a batch of messages for a single contact and channel onto the appropriate courier queue
-func PushCourierBatch(rc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
+func PushCourierBatch(vc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
 	priority := bulkPriority
 	if msgs[0].HighPriority() {
 		priority = highPriority
@@ -230,12 +233,12 @@ func PushCourierBatch(rc redis.Conn, oa *models.OrgAssets, ch *models.Channel, m
 
 	batchJSON := jsonx.MustMarshal(batch)
 
-	_, err := queuePushScript.Do(rc, "msgs", ch.UUID(), ch.TPS(), priority, batchJSON, timestamp)
+	_, err := queuePushScript.Do(vc, "msgs", ch.UUID(), ch.TPS(), priority, batchJSON, timestamp)
 	return err
 }
 
 // QueueCourierMessages queues messages for a single contact to Courier
-func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
+func QueueCourierMessages(vc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -254,7 +257,7 @@ func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.
 	commitBatch := func() error {
 		if len(batch) > 0 {
 			start := time.Now()
-			err := PushCourierBatch(rc, oa, channel, batch, epochSeconds)
+			err := PushCourierBatch(vc, oa, channel, batch, epochSeconds)
 			if err != nil {
 				return err
 			}
@@ -265,7 +268,8 @@ func QueueCourierMessages(rc redis.Conn, oa *models.OrgAssets, contactID models.
 
 	for _, m := range msgs {
 		// sanity check the state of the msg we're about to queue...
-		assert(m.URN != nil && m.ContactURNID() != models.NilURNID, "can't queue a message to courier without a URN")
+		assert(m.URN != nil, "can't queue a message to courier without a URN")
+		assert(m.ContactURNID() != models.NilURNID, "can't queue a message to courier without a URNID")
 
 		// if this msg is the same priority, add to current batch, otherwise start new batch
 		if m.HighPriority() == currentPriority {
@@ -300,8 +304,8 @@ redis.call("ZADD", queueType .. ":active", 0, queueKey)
 `)
 
 // ClearCourierQueues clears the courier queues (priority and bulk) for the given channel
-func ClearCourierQueues(rc redis.Conn, ch *models.Channel) error {
-	_, err := queueClearScript.Do(rc, "msgs", ch.UUID(), ch.TPS())
+func ClearCourierQueues(vc redis.Conn, ch *models.Channel) error {
+	_, err := queueClearScript.Do(vc, "msgs", ch.UUID(), ch.TPS())
 	return err
 }
 
@@ -310,7 +314,7 @@ type fetchAttachmentRequest struct {
 	ChannelType models.ChannelType `json:"channel_type"`
 	ChannelUUID assets.ChannelUUID `json:"channel_uuid"`
 	URL         string             `json:"url"`
-	MsgID       models.MsgID       `json:"msg_id"`
+	MsgUUID     flows.EventUUID    `json:"msg_uuid"`
 }
 
 type fetchAttachmentResponse struct {
@@ -323,12 +327,12 @@ type fetchAttachmentResponse struct {
 }
 
 // FetchAttachment calls courier to fetch the given attachment
-func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgID models.MsgID) (utils.Attachment, clogs.UUID, error) {
+func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgUUID flows.EventUUID) (utils.Attachment, clogs.UUID, error) {
 	payload := jsonx.MustMarshal(&fetchAttachmentRequest{
 		ChannelType: ch.Type(),
 		ChannelUUID: ch.UUID(),
 		URL:         attURL,
-		MsgID:       msgID,
+		MsgUUID:     msgUUID,
 	})
 	req, _ := http.NewRequest("POST", fmt.Sprintf("https://%s/c/_fetch-attachment", rt.Config.Domain), bytes.NewReader(payload))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))

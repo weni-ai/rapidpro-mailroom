@@ -100,13 +100,10 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, oa *models
 	}
 
 	// batches will be processed in the throttled queue unless we're a single contact
-	q := tasks.ThrottledQueue
+	q := rt.Queues.Throttled
 	if len(contactIDs) == 1 {
-		q = tasks.HandlerQueue
+		q = rt.Queues.Realtime
 	}
-
-	rc := rt.VK.Get()
-	defer rc.Close()
 
 	// create tasks for batches of contacts
 	idBatches := slices.Collect(slices.Chunk(contactIDs, startBatchSize))
@@ -115,7 +112,7 @@ func createBroadcastBatches(ctx context.Context, rt *runtime.Runtime, oa *models
 		isLast := (i == len(idBatches)-1)
 
 		batch := bcast.CreateBatch(idBatch, isFirst, isLast)
-		err = tasks.Queue(rc, q, bcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, false)
+		err = tasks.Queue(ctx, rt, q, bcast.OrgID, &SendBroadcastBatchTask{BroadcastBatch: batch}, false)
 		if err != nil {
 			if i == 0 {
 				return fmt.Errorf("error queuing broadcast batch: %w", err)

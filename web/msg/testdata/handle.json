@@ -2,7 +2,7 @@
     {
         "label": "illegal method",
         "method": "GET",
-        "path": "/mr/msg/handle",
+        "path": "/mi/msg/handle",
         "status": 405,
         "response": {
             "error": "illegal method: GET"
@@ -11,34 +11,44 @@
     {
         "label": "invalid org_id",
         "method": "POST",
-        "path": "/mr/msg/handle",
+        "path": "/mi/msg/handle",
         "body": {
             "org_id": 1234,
-            "msg_ids": [
-                1234
+            "msg_uuids": [
+                "0199bad8-f98d-75a3-b641-2718a25ac3f5"
             ]
         },
         "status": 500,
         "response": {
-            "error": "unable to load org assets: error loading environment for org 1234: no org with id: 1234"
+            "error": "error loading org assets: error loading environment for org 1234: no org with id: 1234"
         }
     },
     {
         "label": "response is the ids of the messages that were actually queued for handling",
         "method": "POST",
-        "path": "/mr/msg/handle",
+        "path": "/mi/msg/handle",
         "body": {
             "org_id": 1,
-            "msg_ids": [
-                $cathy_msgin1_id$,
-                $cathy_msgin2_id$,
-                $cathy_msgout_id$
+            "msg_uuids": [
+                "0199bad8-f98d-75a3-b641-2718a25ac3f5",
+                "0199bad9-9791-770d-a47d-8f4a6ea3ad13",
+                "0199bb93-ec0f-703e-9b5b-d26d4b6b133c"
             ]
         },
         "status": 200,
         "response": {
-            "msg_ids": [
-                $cathy_msgin2_id$
+            "msg_uuids": [
+                "0199bad9-9791-770d-a47d-8f4a6ea3ad13"
+            ]
+        },
+        "expected_tasks": {
+            "realtime/1": [
+                {
+                    "type": "handle_contact_event",
+                    "payload": {
+                        "contact_id": 10000
+                    }
+                }
             ]
         }
     }

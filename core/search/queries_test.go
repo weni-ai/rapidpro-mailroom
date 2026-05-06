@@ -15,12 +15,12 @@ import (
 )
 
 func TestBuildRecipientsQuery(t *testing.T) {
-	_, rt := testsuite.Runtime()
+	_, rt := testsuite.Runtime(t)
 
 	dates.SetNowFunc(dates.NewFixedNow(time.Date(2022, 4, 20, 15, 30, 45, 0, time.UTC)))
 	defer dates.SetNowFunc(time.Now)
 
-	oa := testdb.Org1.Load(rt)
+	oa := testdb.Org1.Load(t, rt)
 	flow, err := oa.FlowByID(testdb.Favorites.ID)
 	require.NoError(t, err)
 
@@ -38,13 +38,13 @@ func TestBuildRecipientsQuery(t *testing.T) {
 	}{
 		{ // 0
 			groups:       []*models.Group{doctors, testers},
-			contactUUIDs: []flows.ContactUUID{testdb.Cathy.UUID, testdb.George.UUID},
+			contactUUIDs: []flows.ContactUUID{testdb.Ann.UUID, testdb.Cat.UUID},
 			exclusions:   models.Exclusions{},
-			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "8d024bcd-f473-4719-a00a-bd0bb1190135"`,
+			expected:     `group = "Doctors" OR group = "Testers" OR uuid = "a393abc0-283d-4c9b-a1b3-641a035c34bf" OR uuid = "cd024bcd-f473-4719-a00a-bd0bb1190135"`,
 		},
 		{ // 1
 			groups:       []*models.Group{doctors},
-			contactUUIDs: []flows.ContactUUID{testdb.Cathy.UUID},
+			contactUUIDs: []flows.ContactUUID{testdb.Ann.UUID},
 			exclusions: models.Exclusions{
 				NonActive:         true,
 				InAFlow:           true,
@@ -52,14 +52,14 @@ func TestBuildRecipientsQuery(t *testing.T) {
 				NotSeenSinceDays:  90,
 			},
 			excludeGroups: []*models.Group{testers},
-			expected:      `(group = "Doctors" OR uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > "20-01-2022" AND group != "Testers"`,
+			expected:      `(group = "Doctors" OR uuid = "a393abc0-283d-4c9b-a1b3-641a035c34bf") AND status = "active" AND flow = "" AND history != "Favorites" AND last_seen_on > "20-01-2022" AND group != "Testers"`,
 		},
 		{ // 2
-			contactUUIDs: []flows.ContactUUID{testdb.Cathy.UUID},
+			contactUUIDs: []flows.ContactUUID{testdb.Ann.UUID},
 			exclusions: models.Exclusions{
 				NonActive: true,
 			},
-			expected: `uuid = "6393abc0-283d-4c9b-a1b3-641a035c34bf" AND status = "active"`,
+			expected: `uuid = "a393abc0-283d-4c9b-a1b3-641a035c34bf" AND status = "active"`,
 		},
 		{ // 3
 			userQuery:  `fields.GENDER = "M"`,

@@ -1,0 +1,632 @@
+[
+    {
+        "event": {
+            "uuid": "0197b335-6ded-79a4-95a6-3af85b57f108",
+            "type": "airtime_transferred",
+            "created_on": "2006-01-02T15:04:05Z",
+            "external_id": "12345678",
+            "sender": "tel:4748",
+            "recipient": "tel:+1242563637",
+            "currency": "RWF",
+            "amount": 100,
+            "http_logs": [
+                {
+                    "url": "https://dvs-api.dtone.com/v1/sync/transactions",
+                    "request": "POST /v1/sync/transactions HTTP/1.1\r\n\r\n{}",
+                    "response": "HTTP/1.1 200 OK\r\n\r\n{}",
+                    "elapsed_ms": 123,
+                    "retries": 0,
+                    "status": "success",
+                    "created_on": "2006-01-02T15:04:05Z"
+                }
+            ]
+        },
+        "dynamo": {
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#0197b335-6ded-79a4-95a6-3af85b57f108"
+            },
+            "OrgID": {
+                "N": "1"
+            },
+            "Data": {
+                "M": {
+                    "type": {
+                        "S": "airtime_transferred"
+                    },
+                    "created_on": {
+                        "S": "2006-01-02T15:04:05Z"
+                    },
+                    "http_logs": {
+                        "L": [
+                            {
+                                "M": {
+                                    "created_on": {
+                                        "S": "2006-01-02T15:04:05Z"
+                                    },
+                                    "url": {
+                                        "S": "https://dvs-api.dtone.com/v1/sync/transactions"
+                                    },
+                                    "request": {
+                                        "S": "POST /v1/sync/transactions HTTP/1.1\r\n\r\n{}"
+                                    },
+                                    "response": {
+                                        "S": "HTTP/1.1 200 OK\r\n\r\n{}"
+                                    },
+                                    "elapsed_ms": {
+                                        "N": "123"
+                                    },
+                                    "retries": {
+                                        "N": "0"
+                                    },
+                                    "status": {
+                                        "S": "success"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "external_id": {
+                        "S": "12345678"
+                    },
+                    "sender": {
+                        "S": "tel:4748"
+                    },
+                    "recipient": {
+                        "S": "tel:+1242563637"
+                    },
+                    "currency": {
+                        "S": "RWF"
+                    },
+                    "amount": {
+                        "N": "100"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-2c93-76f8-8f41-6b2d9f33d623",
+            "type": "contact_field_changed",
+            "created_on": "2025-05-04T12:30:56.123456789Z",
+            "field": {
+                "key": "age",
+                "name": "Age"
+            },
+            "value": {
+                "text": "44"
+            }
+        },
+        "dynamo": {
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-2c93-76f8-8f41-6b2d9f33d623"
+            },
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897856"
+            },
+            "Data": {
+                "M": {
+                    "type": {
+                        "S": "contact_field_changed"
+                    },
+                    "created_on": {
+                        "S": "2025-05-04T12:30:56.123456789Z"
+                    },
+                    "field": {
+                        "M": {
+                            "key": {
+                                "S": "age"
+                            },
+                            "name": {
+                                "S": "Age"
+                            }
+                        }
+                    },
+                    "value": {
+                        "M": {
+                            "text": {
+                                "S": "44"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-3463-76f8-a17e-f85e49829fb9",
+            "type": "contact_groups_changed",
+            "created_on": "2025-05-04T12:30:58.123456789Z",
+            "groups_added": [
+                {
+                    "uuid": "0ec97956-c451-48a0-a180-1ce766623e31",
+                    "name": "Males"
+                },
+                {
+                    "uuid": "fac9a1bd-6db5-4efb-8899-097acda87f96",
+                    "name": "Youth"
+                }
+            ],
+            "groups_removed": [
+                {
+                    "uuid": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d",
+                    "name": "Testers"
+                }
+            ]
+        },
+        "dynamo": {
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-3463-76f8-a17e-f85e49829fb9"
+            },
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897858"
+            },
+            "Data": {
+                "M": {
+                    "groups_removed": {
+                        "L": [
+                            {
+                                "M": {
+                                    "uuid": {
+                                        "S": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d"
+                                    },
+                                    "name": {
+                                        "S": "Testers"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "type": {
+                        "S": "contact_groups_changed"
+                    },
+                    "created_on": {
+                        "S": "2025-05-04T12:30:58.123456789Z"
+                    },
+                    "groups_added": {
+                        "L": [
+                            {
+                                "M": {
+                                    "uuid": {
+                                        "S": "0ec97956-c451-48a0-a180-1ce766623e31"
+                                    },
+                                    "name": {
+                                        "S": "Males"
+                                    }
+                                }
+                            },
+                            {
+                                "M": {
+                                    "uuid": {
+                                        "S": "fac9a1bd-6db5-4efb-8899-097acda87f96"
+                                    },
+                                    "name": {
+                                        "S": "Youth"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-28ab-76f8-8f41-6b2d9f33d623",
+            "type": "contact_language_changed",
+            "created_on": "2025-05-04T12:30:55.123456789Z",
+            "language": "spa"
+        },
+        "dynamo": {
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897855"
+            },
+            "Data": {
+                "M": {
+                    "created_on": {
+                        "S": "2025-05-04T12:30:55.123456789Z"
+                    },
+                    "language": {
+                        "S": "spa"
+                    },
+                    "type": {
+                        "S": "contact_language_changed"
+                    }
+                }
+            },
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-28ab-76f8-8f41-6b2d9f33d623"
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-28ab-76f8-8f41-6b2d9f33d623",
+            "type": "contact_language_changed",
+            "created_on": "2025-05-04T12:30:55.123456789Z",
+            "language": ""
+        },
+        "dynamo": {
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897855"
+            },
+            "Data": {
+                "M": {
+                    "type": {
+                        "S": "contact_language_changed"
+                    },
+                    "created_on": {
+                        "S": "2025-05-04T12:30:55.123456789Z"
+                    },
+                    "language": {
+                        "S": ""
+                    }
+                }
+            },
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-28ab-76f8-8f41-6b2d9f33d623"
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-28ab-76f8-8f41-6b2d9f33d623",
+            "type": "contact_name_changed",
+            "created_on": "2025-05-04T12:30:55.123456789Z",
+            "_user": {
+                "uuid": "ea84a3d7-92e4-4a8b-b01f-db11ff83bbb6",
+                "name": "Ed McEditor"
+            },
+            "name": "Bryan"
+        },
+        "dynamo": {
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897855"
+            },
+            "Data": {
+                "M": {
+                    "created_on": {
+                        "S": "2025-05-04T12:30:55.123456789Z"
+                    },
+                    "_user": {
+                        "M": {
+                            "uuid": {
+                                "S": "ea84a3d7-92e4-4a8b-b01f-db11ff83bbb6"
+                            },
+                            "name": {
+                                "S": "Ed McEditor"
+                            }
+                        }
+                    },
+                    "name": {
+                        "S": "Bryan"
+                    },
+                    "type": {
+                        "S": "contact_name_changed"
+                    }
+                }
+            },
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-28ab-76f8-8f41-6b2d9f33d623"
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-3463-76f8-a17e-f85e49829fb9",
+            "type": "contact_urns_changed",
+            "created_on": "2025-05-04T12:30:58.123456789Z",
+            "urns": [
+                "tel:+12065551212?channel=57f1078f-88aa-46f4-a59a-948a5739c03d&id=123",
+                "twitterid:54784326227#nyaruka",
+                "mailto:bob@nyaruka.com"
+            ]
+        },
+        "dynamo": {
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-3463-76f8-a17e-f85e49829fb9"
+            },
+            "OrgID": {
+                "N": "1"
+            },
+            "TTL": {
+                "N": "1777897858"
+            },
+            "Data": {
+                "M": {
+                    "created_on": {
+                        "S": "2025-05-04T12:30:58.123456789Z"
+                    },
+                    "urns": {
+                        "L": [
+                            {
+                                "S": "tel:+12065551212?channel=57f1078f-88aa-46f4-a59a-948a5739c03d&id=123"
+                            },
+                            {
+                                "S": "twitterid:54784326227#nyaruka"
+                            },
+                            {
+                                "S": "mailto:bob@nyaruka.com"
+                            }
+                        ]
+                    },
+                    "type": {
+                        "S": "contact_urns_changed"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-672b-76f8-bebe-b4a1f677cf4c",
+            "type": "session_triggered",
+            "created_on": "2025-05-04T12:31:11.123456789Z",
+            "flow": {
+                "uuid": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d",
+                "name": "Registration Flow"
+            },
+            "contacts": [
+                {
+                    "uuid": "820f5923-3369-41c6-b3cd-af577c0bd4b8",
+                    "name": "Bob"
+                }
+            ],
+            "exclusions": {},
+            "run_summary": {
+                "contact": {
+                    "created_on": "2000-01-01T00:00:00Z",
+                    "fields": {
+                        "activation_token": {
+                            "text": "XXX-YYY-ZZZ"
+                        },
+                        "first_name": {
+                            "text": "Ben"
+                        },
+                        "raw_district": {
+                            "text": "I live in gasabo"
+                        },
+                        "state": {
+                            "state": "Rwanda > Kigali City",
+                            "text": "Rwanda > Kigali City"
+                        }
+                    },
+                    "groups": [
+                        {
+                            "name": "Survey Audience",
+                            "uuid": "2aad21f6-30b7-42c5-bd7f-1b720c154817"
+                        },
+                        {
+                            "name": "Kigali City Members",
+                            "uuid": "d7ff4872-9238-452f-9d38-2f558fea89e0"
+                        }
+                    ],
+                    "id": 1234567,
+                    "language": "eng",
+                    "last_seen_on": "2006-01-02T15:04:05Z",
+                    "name": "Ben Haggerty",
+                    "status": "active",
+                    "timezone": "America/Guayaquil",
+                    "urns": [
+                        "tel:+12065551212",
+                        "facebook:1122334455667788",
+                        "mailto:ben@macklemore",
+                        "twitter:ben_haggerty"
+                    ],
+                    "uuid": "ba96bf7f-bc2a-4873-a7c7-254d1927c4e3"
+                },
+                "flow": {
+                    "name": "All Actions",
+                    "uuid": "8ca44c09-791d-453a-9799-a70dd3303306"
+                },
+                "results": {
+                    "2factor": {
+                        "category": "",
+                        "category_localized": "",
+                        "created_on": "2025-05-04T12:31:27.123456Z",
+                        "extra": null,
+                        "input": "",
+                        "name": "2Factor",
+                        "node_uuid": "f5bb9b7a-7b5e-45c3-8f0e-61b4e95edf03",
+                        "value": "34634624463525"
+                    },
+                    "favorite_color": {
+                        "category": "Red",
+                        "category_localized": "Red",
+                        "created_on": "2025-05-04T12:31:22.123456Z",
+                        "extra": null,
+                        "input": "",
+                        "name": "Favorite Color",
+                        "node_uuid": "f5bb9b7a-7b5e-45c3-8f0e-61b4e95edf03",
+                        "value": "red"
+                    }
+                },
+                "status": "active",
+                "uuid": "01969b47-113b-76f8-9c0b-2014ddc77094"
+            },
+            "history": {
+                "parent_uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "ancestors": 1,
+                "ancestors_since_input": 0
+            }
+        },
+        "dynamo": {
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-672b-76f8-bebe-b4a1f677cf4c"
+            },
+            "OrgID": {
+                "N": "1"
+            },
+            "Data": {
+                "M": {
+                    "type": {
+                        "S": "session_triggered"
+                    }
+                }
+            },
+            "DataGZ": {
+                "B": "H4sIAAAAAAAA/6RVXY/dNBD9K5FficGfcZIntpUKCPGy9KHdUkVje3xrNddZEmc/Wt3/jpyb3i6loEpIeYjt0Zk5Z47HH8m6Rk96wnjXdFYZ2hhhqWlCSy1apFYBD40xLihHapIfb5H0ZMFliVMa8hwPB5zRk5q4GSGjH6ZEeiKY0JRpytRLLnrJe86/50Iq3Zi2uyE1CeN0T/pLemtcYL6VNHDXUcW5o10TPHWac1AuQNuUHAmOJf01HuKSZ8hxStWLgnSqiZtSBpcX0r+5wLaCBd0JSaVsCqxrqJXOUwjaGMesV7b9DPtssuT0tib44Ma18FtI//FUk3lNw7IejzA/lpL3RNvv3zkzRhmnjL9krN++jWnE0RckAi7Hu63oIU/vMZW9jA+Z9OTVq1f09evX9ObmpnAJcV7ycC7rEvMMUzmb4X7whX4817Cf/lKN8Q6rmKoDLGCnErpkyBvC/kOu7yF5qP5YGZNY/RoPMMbqecyPpbVnnH8POZ1qcpin9fYs8S7a7+t8h4/V1eojJoek/qS9APCCh4ZKZg1VwmlqvQmUWyOY41q13JBTfQF6kqr6DY8W5+UzmDchqNYI2gnZUqVFoJ2XLRVB6zYgtB2yrXclejdaTUZIhxUOBR3TgZSNJQ8LYrp0rNk6Jl5y3TPVM33zxA6Yqp+h+HvTp2i4LqQ/t7EQzfGIH6ZUYq+OOEcHP/y0wiP8ucaxlD4XA70hGcf+Oy5Yo7XmgoviCXBop+l9z7kQUiqlddMY0xYzHiGOeeotph+P4N6PeJzmLdt9zBnncjC8+1TW24tCFrrGBhOodQKoao2kYJyhQivPO2GcQrlZa794O8mrcayuXN7MfsFqHSjlWEdNxz1VWgLtTNdRMMx7KZmUrNmsiMs65s3bIoDL07xdCsh4mMpdIWUs7KthnByM8QP6ff8/x4Uw+7go/cCHPAPp0zqONYnpds1niJ2CeHFOXZM0eRx2DkFb21kD1FiNVGknaRsY0oZbhZ1GH5gkNbmDcS0gUjVSNUKpRmqhN6HgbppjxsFN4z+IXZ9H3te4XX/DNBTi2+m92Ouonm91/C+WZVKfTl/z8pfPAOdyfwY6xywVjCvvnTGsU0Wcd3HJ03kc3sKMKQ9fAjDdyjMAoAk0tFYo6VQXgiY1geSwICyk509WwxKTw2EXgZ1OfwUAAP//2W7dH6AGAAA="
+            }
+        }
+    },
+    {
+        "event": {
+            "uuid": "01969b47-672b-76f8-bebe-b4a1f677cf4c",
+            "type": "session_triggered",
+            "created_on": "2025-05-04T12:31:11.123456789Z",
+            "_user": {
+                "uuid": "e29fdf9f-56ab-422a-b77d-e3ec26091a25",
+                "name": "Andy Admin"
+            },
+            "flow": {
+                "uuid": "b7cf0d83-f1c9-411c-96fd-c511a4cfa86d",
+                "name": "Registration Flow"
+            },
+            "contacts": [
+                {
+                    "uuid": "820f5923-3369-41c6-b3cd-af577c0bd4b8",
+                    "name": "Bob"
+                }
+            ],
+            "exclusions": {},
+            "run_summary": {
+                "contact": {
+                    "created_on": "2000-01-01T00:00:00Z",
+                    "fields": {
+                        "activation_token": {
+                            "text": "XXX-YYY-ZZZ"
+                        },
+                        "first_name": {
+                            "text": "Ben"
+                        },
+                        "raw_district": {
+                            "text": "I live in gasabo"
+                        },
+                        "state": {
+                            "state": "Rwanda > Kigali City",
+                            "text": "Rwanda > Kigali City"
+                        }
+                    },
+                    "groups": [
+                        {
+                            "name": "Survey Audience",
+                            "uuid": "2aad21f6-30b7-42c5-bd7f-1b720c154817"
+                        },
+                        {
+                            "name": "Kigali City Members",
+                            "uuid": "d7ff4872-9238-452f-9d38-2f558fea89e0"
+                        }
+                    ],
+                    "id": 1234567,
+                    "language": "eng",
+                    "last_seen_on": "2006-01-02T15:04:05Z",
+                    "name": "Ben Haggerty",
+                    "status": "active",
+                    "timezone": "America/Guayaquil",
+                    "urns": [
+                        "tel:+12065551212",
+                        "facebook:1122334455667788",
+                        "mailto:ben@macklemore",
+                        "twitter:ben_haggerty"
+                    ],
+                    "uuid": "ba96bf7f-bc2a-4873-a7c7-254d1927c4e3"
+                },
+                "flow": {
+                    "name": "All Actions",
+                    "uuid": "8ca44c09-791d-453a-9799-a70dd3303306"
+                },
+                "results": {
+                    "2factor": {
+                        "category": "",
+                        "category_localized": "",
+                        "created_on": "2025-05-04T12:31:27.123456Z",
+                        "extra": null,
+                        "input": "",
+                        "name": "2Factor",
+                        "node_uuid": "f5bb9b7a-7b5e-45c3-8f0e-61b4e95edf03",
+                        "value": "34634624463525"
+                    },
+                    "favorite_color": {
+                        "category": "Red",
+                        "category_localized": "Red",
+                        "created_on": "2025-05-04T12:31:22.123456Z",
+                        "extra": null,
+                        "input": "",
+                        "name": "Favorite Color",
+                        "node_uuid": "f5bb9b7a-7b5e-45c3-8f0e-61b4e95edf03",
+                        "value": "red"
+                    }
+                },
+                "status": "active",
+                "uuid": "01969b47-113b-76f8-9c0b-2014ddc77094"
+            },
+            "history": {
+                "parent_uuid": "01969b47-0583-76f8-ae7f-f8b243c49ff5",
+                "ancestors": 1,
+                "ancestors_since_input": 0
+            }
+        },
+        "dynamo": {
+            "OrgID": {
+                "N": "1"
+            },
+            "Data": {
+                "M": {
+                    "type": {
+                        "S": "session_triggered"
+                    }
+                }
+            },
+            "DataGZ": {
+                "B": "H4sIAAAAAAAA/6SVz27cNhDGX0XgtWLLv6KkU50AaYuiFzeHxGkgDMnhhoiWciXKjhPsuxfUKms3TYsABXSQKOI3M998HH4i6xo96QnjXdNZZWhjhKWmCS21aJFaBTw0xrigHKlJfrhF0pMFlyVOachzPBxwRk9q4maEjH6YEumJYEJTpilTL7noJe85/54LqXRj2u6G1GRYF5xJf4mPogs+dIHqBixVQgC1xniKEp1oWMdBaFKTBMcS/yr5h+rKH2Mip5qEcbp/grLGBeZbSQN3HVWcO9o1wVOnOQflArSNf0Rd4yEueYYcp1S9KKRTTdyUMri8kP7NBdsKFnQnJJWyKVjXUCudpxC0MY5Zr2z7iH02WXJ6WxP84Ma1aLWQ/tOpJvOahmU9HmF+KCnvgbbXv+vHGGWcMv6SsX57imoh4ugLiYDL8W5LesjTe0xlLeOHTHry6tUr+vr1a3pzc7OpE+clD+e0Lnue4abcDPeDL+XHcw7731+qMd5hFVN1gAXsVLYuGfJG2F/I9T0kD9UfK2MSq1/jAcZYPY/5odjkzPn3LadTTQ7ztN6eJd5F+32d7/Chulp9xOSQ1J+1FwBe8NBQyayhSjhNrTeBcmsEc1yrlhtyqi+gJ6Gq3/BocV4eYd6EoFojaCdkS5UWgXZetlQErduA0HbItt6V3btpazJCOqxwKHRMB1IWljwsiOnSsWbrmHjJdc9Uz/TNEztgqn6GclY2fYqG60L6cxtLoTke8eOUNnMfcY4OfvhphQf4c41jSX0uBnpDMo79d1ywRmvNBRfFE+DQTtP7nnMhpFRK66Yxpi1mPEIc89RbTD8ewb0f8TjNW7T7mDPO5cfw7nNaby8KWegaG0yg1gmgqjWSgnGGCq0874RxCuXTg/f5VI5jdeXyZvYLq3WglGMdNR33VGkJtDNdR8Ew76VkUrJmsyIu65g3b4sALk/bdHCQ8TCVs0LKiNm/hnFyMMaP6Pf1/xw9wuyjp/QDP+QZSJ/WcaxJTLdrPiP2EsSLc+iapMnjsNcQtLWdNUCN1UiVdpK2gSFtuFXYafSBSVKTOxjXApGqkaoRSjVSC70JBXfTHDMObhr/Udj1eXx+rbbrb5isQnx7eS/2PKrnWx7/q8oy9U+nr3n5yyuFc7lfKZ1jlgrGlffOGNapIs67uOTpPA5vYcaUhy8BTLfyDAA0gYbWCiWd6kIodwIkh4WwkJ4/+RqWmBwOuwjsdPorAAD//7EFte/sBgAA"
+            },
+            "PK": {
+                "S": "con#a393abc0-283d-4c9b-a1b3-641a035c34bf"
+            },
+            "SK": {
+                "S": "evt#01969b47-672b-76f8-bebe-b4a1f677cf4c"
+            }
+        }
+    }
+]

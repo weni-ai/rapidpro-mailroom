@@ -16,11 +16,9 @@ import (
 )
 
 func TestRetryCalls(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-	rc := rt.VK.Get()
-	defer rc.Close()
+	ctx, rt := testsuite.Runtime(t)
 
-	defer testsuite.Reset(testsuite.ResetAll)
+	defer testsuite.Reset(t, rt, testsuite.ResetAll)
 
 	// register our mock client
 	ivr.RegisterService(models.ChannelType("ZZ"), testsuite.NewIVRServiceFactory)
@@ -28,13 +26,13 @@ func TestRetryCalls(t *testing.T) {
 	// update our twilio channel to be of type 'ZZ' and set max_concurrent_events to 1
 	rt.DB.MustExec(`UPDATE channels_channel SET channel_type = 'ZZ', config = '{"max_concurrent_events": 1}' WHERE id = $1`, testdb.TwilioChannel.ID)
 
-	// create a flow start for cathy
+	// create a flow start for Ann
 	start := models.NewFlowStart(testdb.Org1.ID, models.StartTypeTrigger, testdb.IVRFlow.ID).
-		WithContactIDs([]models.ContactID{testdb.Cathy.ID})
-	err := models.InsertFlowStarts(ctx, rt.DB, []*models.FlowStart{start})
+		WithContactIDs([]models.ContactID{testdb.Ann.ID})
+	err := models.InsertFlowStart(ctx, rt.DB, start)
 	require.NoError(t, err)
 
-	err = tasks.Queue(rc, tasks.BatchQueue, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
+	err = tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
 	require.NoError(t, err)
 
 	testsuite.IVRService.CallError = nil
@@ -43,7 +41,7 @@ func TestRetryCalls(t *testing.T) {
 	testsuite.FlushTasks(t, rt)
 
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdb.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
+		testdb.Ann.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// change our call to be errored instead of wired
 	rt.DB.MustExec(`UPDATE ivr_call SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
@@ -56,7 +54,7 @@ func TestRetryCalls(t *testing.T) {
 
 	// should now be in wired state
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdb.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
+		testdb.Ann.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// back to retry and make the channel inactive
 	rt.DB.MustExec(`UPDATE ivr_call SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
@@ -68,5 +66,5 @@ func TestRetryCalls(t *testing.T) {
 
 	// this time should be failed
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdb.Cathy.ID, models.CallStatusFailed, "call1").Returns(1)
+		testdb.Ann.ID, models.CallStatusFailed, "call1").Returns(1)
 }
