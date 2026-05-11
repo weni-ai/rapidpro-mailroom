@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/models"
@@ -33,6 +34,7 @@ func handleTicketAssigneeChanged(ctx context.Context, rt *runtime.Runtime, oa *m
 
 	dbTicket := scene.DBContact.FindTicket(event.TicketUUID)
 	dbTicket.AssigneeID = assigneeID
+	dbTicket.LastActivityOn = dates.Now()
 
 	scene.AttachPreCommitHook(hooks.UpdateTickets, dbTicket)
 

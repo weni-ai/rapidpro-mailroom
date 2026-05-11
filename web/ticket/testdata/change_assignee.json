@@ -60,6 +60,10 @@
             {
                 "query": "SELECT count(*) FROM tickets_ticket WHERE assignee_id = 5",
                 "returns": 3
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE assignee_id = 5 AND last_activity_on > '2000-01-01'",
+                "returns": 3
             }
         ],
         "expected_history": [
@@ -145,6 +149,10 @@
         "db_assertions": [
             {
                 "query": "SELECT count(*) FROM tickets_ticket WHERE id = 30000 AND assignee_id IS NULL",
+                "returns": 1
+            },
+            {
+                "query": "SELECT count(*) FROM tickets_ticket WHERE id = 30000 AND last_activity_on > '2000-01-01'",
                 "returns": 1
             }
         ],
