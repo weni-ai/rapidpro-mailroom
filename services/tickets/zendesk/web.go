@@ -269,7 +269,7 @@ func handleTicketerWebhook(ctx context.Context, rt *runtime.Runtime, r *http.Req
 
 	// parse request payload
 	request := &webhookRequest{}
-	if err := utils.UnmarshalAndValidateWithLimit(r.Body, request, web.MaxRequestBytes); err != nil {
+	if err := web.ReadAndValidateJSON(r, request); err != nil {
 		return err, http.StatusBadRequest, nil
 	}
 

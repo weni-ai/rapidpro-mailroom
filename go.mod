@@ -3,14 +3,17 @@ module github.com/nyaruka/mailroom
 go 1.19
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.44.146
 	github.com/buger/jsonparser v1.1.1
 	github.com/edganiukov/fcm v0.4.0
+	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gomodule/redigo v1.8.9
+	github.com/google/go-querystring v1.2.0
 	github.com/gorilla/schema v1.2.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.7
@@ -38,7 +41,6 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/getsentry/raven-go v0.1.2-0.20190125112653-238ebd86338d // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
