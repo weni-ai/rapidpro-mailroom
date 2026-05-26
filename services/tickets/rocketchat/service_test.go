@@ -27,7 +27,7 @@ func TestOpenAndForward(t *testing.T) {
 	ctx, rt, _, _ := testsuite.Get()
 
 	defer dates.SetNowSource(dates.DefaultNowSource)
-	dates.SetNowSource(dates.NewSequentialNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
+	dates.SetNowSource(dates.NewFixedNowSource(time.Date(2019, 10, 7, 15, 21, 30, 0, time.UTC)))
 
 	session, _, err := test.CreateTestSession("", envs.RedactionPolicyNone)
 	require.NoError(t, err)

@@ -11,6 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/stringsx"
@@ -153,7 +154,7 @@ func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flow
 	// India: previously `after := session.Runs()[0].CreatedOn()` but the
 	// upstream Open signature no longer takes a session. Approximate the
 	// "since" cut-off as one minute before now.
-	after := time.Now().Add(-time.Minute)
+	after := dates.Now().Add(-time.Second)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)

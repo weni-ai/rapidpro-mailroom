@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/stringsx"
@@ -86,7 +87,7 @@ func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flow
 	// India: previously this used session.Runs()[0].CreatedOn() but the upstream
 	// Open signature no longer takes a session. Approximate session start as
 	// "one minute before now" to keep the field populated.
-	room.SessionStart = time.Now().Add(-time.Minute).Format(time.RFC3339)
+	room.SessionStart = dates.Now().Add(-time.Minute).Format(time.RFC3339)
 
 	// to fully support the RocketChat ticketer, look up extra fields from ticket body for now
 	extra := &struct {

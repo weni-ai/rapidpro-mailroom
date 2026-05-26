@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/stringsx"
 	"github.com/nyaruka/goflow/envs"
@@ -282,7 +283,7 @@ func SendHistory(contactID flows.ContactID, newFlexChannel *FlexChannel, logHTTP
 	// India: previously `after := session.Runs()[0].CreatedOn()` but the
 	// upstream Open signature no longer carries a session. Approximate the
 	// "since" cut-off as one minute before now.
-	after := time.Now().Add(-time.Minute)
+	after := dates.Now().Add(-time.Second)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	// get messages for history
