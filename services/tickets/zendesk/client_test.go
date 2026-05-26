@@ -13,12 +13,12 @@ import (
 
 func TestCreateWebhook(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/webhooks": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{"description": "Something went wrong", "error": "Unknown"}`), // non-200 response
-			httpx.NewMockResponse(200, nil, `xx`), // non-JSON response
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(400, nil, []byte(`{"description": "Something went wrong", "error": "Unknown"}`)), // non-200 response
+			httpx.NewMockResponse(200, nil, []byte(`xx`)), // non-JSON response
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"webhook": {
 					"id": "1234567",
 					"name": "Temba",
@@ -80,9 +80,9 @@ func TestCreateWebhook(t *testing.T) {
 
 func TestDeleteWebhook(t *testing.T) {
 	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		"https://nyaruka.zendesk.com/api/v2/webhooks/123": {
-			httpx.NewMockResponse(200, nil, ``),
+			httpx.NewMockResponse(200, nil, nil),
 		},
 	}))
 

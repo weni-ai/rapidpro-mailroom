@@ -103,25 +103,25 @@ func TestRetryCallsInWorkerPool(t *testing.T) {
 	err = json.Unmarshal(task.Task, batch)
 	assert.NoError(t, err)
 
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusWired, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// change our call to be errored instead of wired
-	db.MustExec(`UPDATE channels_channelconnection SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
+	db.MustExec(`UPDATE ivr_call SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
 
 	err = ivrtasks.RetryCallsInWorkerPool(ctx, rt)
 	assert.NoError(t, err)
 
 	// should now be in wired state
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusWired, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusWired, "call1").Returns(1)
 
 	// back to retry and make the channel inactive
-	db.MustExec(`UPDATE channels_channelconnection SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
+	db.MustExec(`UPDATE ivr_call SET status = 'E', next_attempt = NOW() WHERE external_id = 'call1';`)
 	db.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdata.TwilioChannel.ID)
 
 	models.FlushCache()
@@ -129,8 +129,8 @@ func TestRetryCallsInWorkerPool(t *testing.T) {
 	assert.NoError(t, err)
 
 	// this time should be failed
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusFailed, "call1").Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusFailed, "call1").Returns(1)
 }
 
 func TestClearConnections(t *testing.T) {
@@ -157,18 +157,18 @@ func TestClearConnections(t *testing.T) {
 	err = json.Unmarshal(task.Task, batch)
 	assert.NoError(t, err)
 
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
 	assertdb.Query(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusWired, "call1",
+		`SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusWired, "call1",
 	).Returns(1)
 
 	// update channel connection to be modified_on 2 days ago
-	db.MustExec(`UPDATE channels_channelconnection SET modified_on = NOW() - INTERVAL '2 DAY' WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusWired, "call1",
+	db.MustExec(`UPDATE ivr_call SET modified_on = NOW() - INTERVAL '2 DAY' WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusWired, "call1",
 	)
 
 	// cleaning
@@ -177,8 +177,8 @@ func TestClearConnections(t *testing.T) {
 
 	// status should be Failed
 	assertdb.Query(t, db,
-		`SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
-		testdata.Cathy.ID, models.ConnectionStatusFailed, "call1",
+		`SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2 AND external_id = $3`,
+		testdata.Cathy.ID, models.CallStatusFailed, "call1",
 	).Returns(1)
 }
 
@@ -220,12 +220,12 @@ func TestUpdateMaxChannelsConnection(t *testing.T) {
 	err = json.Unmarshal(task.Task, batch)
 	assert.NoError(t, err)
 
-	client.callError = nil
-	client.callID = ivr.CallID("call1")
+	service.callError = nil
+	service.callID = ivr.CallID("call1")
 	err = ivrtasks.HandleFlowStartBatch(ctx, rt, batch)
 	assert.NoError(t, err)
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`,
-		testdata.Cathy.ID, models.ConnectionStatusQueued).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`,
+		testdata.Cathy.ID, models.CallStatusQueued).Returns(1)
 
 	//set max_concurrent_events to 500
 	err = ivrtasks.ChangeMaxConnectionsConfig(ctx, rt, "ZZ", 500)
@@ -238,7 +238,7 @@ func TestUpdateMaxChannelsConnection(t *testing.T) {
 	assert.Equal(t, 500, int(conf2["max_concurrent_events"].(float64)))
 
 	// change our call to next attempt to be now minus 1 minute
-	db.MustExec(`UPDATE channels_channelconnection SET next_attempt = NOW() - INTERVAL '1 MINUTE' WHERE contact_id = $1;`, testdata.Cathy.ID)
+	db.MustExec(`UPDATE ivr_call SET next_attempt = NOW() - INTERVAL '1 MINUTE' WHERE contact_id = $1;`, testdata.Cathy.ID)
 	assert.NoError(t, err)
 
 	db.MustExec("SELECT pg_sleep(5)")
@@ -246,8 +246,8 @@ func TestUpdateMaxChannelsConnection(t *testing.T) {
 	err = ivrtasks.RetryCalls(ctx, rt)
 	assert.NoError(t, err)
 
-	assertdb.Query(t, db, `SELECT COUNT(*) FROM channels_channelconnection WHERE contact_id = $1 AND status = $2`,
-		testdata.Cathy.ID, models.ConnectionStatusWired).Returns(1)
+	assertdb.Query(t, db, `SELECT COUNT(*) FROM ivr_call WHERE contact_id = $1 AND status = $2`,
+		testdata.Cathy.ID, models.CallStatusWired).Returns(1)
 }
 
 func TestSetupLocation(t *testing.T) {

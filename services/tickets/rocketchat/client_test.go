@@ -20,8 +20,8 @@ func TestCreateRoom(t *testing.T) {
 	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		baseURL + "/room": {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(400, nil, `{ "error": "Could not find a department for name: kitchen" }`),
-			httpx.NewMockResponse(201, nil, `{ "id": "uiF7ybjsv7PSJGSw6" }`),
+			httpx.NewMockResponse(400, nil, []byte(`{ "error": "Could not find a department for name: kitchen" }`)),
+			httpx.NewMockResponse(201, nil, []byte(`{ "id": "uiF7ybjsv7PSJGSw6" }`)),
 		},
 	}))
 
