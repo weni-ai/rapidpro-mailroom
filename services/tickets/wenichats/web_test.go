@@ -15,6 +15,15 @@ func TestEventCallback(t *testing.T) {
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
+	// India: the Wenichats ticketer is not part of the upstream test
+	// database fixture (mailroom_test.dump) yet, so insert it on the fly.
+	db.MustExec(
+		`INSERT INTO tickets_ticketer (id, is_active, created_on, modified_on, uuid, ticketer_type, name, config, created_by_id, modified_by_id, org_id, is_system)
+		 VALUES ($1, TRUE, NOW(), NOW(), $2, 'wenichats', 'Wenichats', '{}', 2, 2, 1, FALSE)
+		 ON CONFLICT (id) DO NOTHING`,
+		testdata.Wenichats.ID, testdata.Wenichats.UUID,
+	)
+
 	ticket := testdata.InsertOpenTicket(
 		db,
 		testdata.Org1,
