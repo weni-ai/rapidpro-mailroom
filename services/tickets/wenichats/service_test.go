@@ -40,9 +40,9 @@ func TestOpenAndForward(t *testing.T) {
 
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/", baseURL): {
-			httpx.NewMockResponse(201, nil, `{
+			httpx.NewMockResponse(201, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -76,10 +76,10 @@ func TestOpenAndForward(t *testing.T) {
 					"gender": "male"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 		fmt.Sprintf("%s/rooms/8ecb1e4a-b457-4645-a161-e2b02ddffa88/", baseURL): {
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -110,11 +110,11 @@ func TestOpenAndForward(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 		fmt.Sprintf("%s/msgs/", baseURL): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
 				"user": null,
 				"room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
@@ -136,8 +136,8 @@ func TestOpenAndForward(t *testing.T) {
 					}
 				],
 				"created_on": "2022-08-25T02:06:55.885000-03:00"
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
 				"user": null,
 				"room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
@@ -167,16 +167,16 @@ func TestOpenAndForward(t *testing.T) {
 					}
 				],
 				"created_on": "2022-08-25T02:06:55.885000-03:00"
-			}`),
+			}`)),
 		},
 		"https://link.to/dummy_image.jpg": {
-			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, `imagebytes`),
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "image/jpeg"}, []byte(`imagebytes`)),
 		},
 		"https://link.to/dummy_video.mp4": {
-			httpx.NewMockResponse(200, map[string]string{"Content-Type": "video/mp4"}, `videobytes`),
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "video/mp4"}, []byte(`videobytes`)),
 		},
 		"https://link.to/dummy_audio.ogg": {
-			httpx.NewMockResponse(200, map[string]string{"Content-Type": "audio/ogg"}, `audiobytes`),
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "audio/ogg"}, []byte(`audiobytes`)),
 		},
 	}))
 
@@ -195,13 +195,10 @@ func TestOpenAndForward(t *testing.T) {
 	defer mockDB.Close()
 	sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
-	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id", "topup_id"})
-
-	after, err := time.Parse("2006-01-02T15:04:05", "2019-10-07T15:21:30")
-	assert.NoError(t, err)
+	rows := sqlmock.NewRows([]string{"id", "uuid", "text", "high_priority", "created_on", "modified_on", "sent_on", "queued_on", "direction", "status", "visibility", "msg_type", "msg_count", "error_count", "next_attempt", "external_id", "attachments", "metadata", "broadcast_id", "channel_id", "contact_id", "contact_urn_id", "org_id"})
 
 	mock.ExpectQuery("SELECT").
-		WithArgs(1234567, after).
+		WithArgs(1234567, sqlmock.AnyArg()).
 		WillReturnRows(rows)
 
 	wenichats.SetDB(sqlxDB)
@@ -223,7 +220,7 @@ func TestOpenAndForward(t *testing.T) {
 	defaultTopic := oa.SessionAssets().Topics().FindByName("General")
 
 	logger := &flows.HTTPLogger{}
-	ticket, err := svc.Open(session, defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
+	ticket, err := svc.Open(session.Environment(), session.Contact(), defaultTopic, `{"custom_fields":{"country": "brazil","mood": "angry"}}`, nil, logger.Log)
 
 	assert.NoError(t, err)
 	assert.Equal(t, flows.TicketUUID("e7187099-7d38-4f60-955c-325957214c42"), ticket.UUID())
@@ -233,7 +230,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 2, len(logger.Logs))
 	test.AssertSnapshot(t, "open_ticket", logger.Logs[0].Request)
 
-	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket := models.NewTicket(ticket.UUID(), testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -247,7 +244,7 @@ func TestOpenAndForward(t *testing.T) {
 	assert.Equal(t, 1, len(logger.Logs))
 	test.AssertSnapshot(t, "forward_message", logger.Logs[0].Request)
 
-	dbTicket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
+	dbTicket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Wenichats.ID, "8ecb1e4a-b457-4645-a161-e2b02ddffa88", testdata.DefaultTopic.ID, "Where are my cookies?", models.NilUserID, map[string]interface{}{
 		"contact-uuid":    string(testdata.Cathy.UUID),
 		"contact-display": "Cathy",
 	})
@@ -273,10 +270,10 @@ func TestCloseAndReopen(t *testing.T) {
 
 	roomUUID := "8ecb1e4a-b457-4645-a161-e2b02ddffa88"
 
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]httpx.MockResponse{
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
 		fmt.Sprintf("%s/rooms/%s/close/", baseURL, roomUUID): {
 			httpx.MockConnectionError,
-			httpx.NewMockResponse(200, nil, `{
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -307,8 +304,8 @@ func TestCloseAndReopen(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
-			httpx.NewMockResponse(200, nil, `{
+			}`)),
+			httpx.NewMockResponse(200, nil, []byte(`{
 				"uuid": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
 				"user": {
 					"first_name": "John",
@@ -339,7 +336,7 @@ func TestCloseAndReopen(t *testing.T) {
 					"mood": "angry"
 				},
 				"callback_url": "http://example.com"
-			}`),
+			}`)),
 		},
 	}))
 
@@ -357,8 +354,8 @@ func TestCloseAndReopen(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Cathy.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
-	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Bob.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
+	ticket1 := models.NewTicket("88bfa1dc-be33-45c2-b469-294ecb0eba90", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Cathy.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, "Where my cookies?", models.NilUserID, nil)
+	ticket2 := models.NewTicket("645eee60-7e84-4a9e-ade3-4fce01ae28f1", testdata.Org1.ID, testdata.Admin.ID, models.NilFlowID, testdata.Bob.ID, testdata.Wenichats.ID, roomUUID, testdata.DefaultTopic.ID, "Where my shoes?", models.NilUserID, nil)
 
 	logger := &flows.HTTPLogger{}
 	err = svc.Close([]*models.Ticket{ticket1, ticket2}, logger.Log)

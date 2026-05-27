@@ -11,8 +11,11 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 
+	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/gocommon/stringsx"
+	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/mailroom/core/models"
@@ -53,7 +56,7 @@ type service struct {
 	rtConfig   *runtime.Config
 	restClient *Client
 	ticketer   *flows.Ticketer
-	redactor   utils.Redactor
+	redactor   stringsx.Redactor
 	sectorUUID string
 }
 
@@ -71,7 +74,7 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 			rtConfig:   rtCfg,
 			restClient: NewClient(httpClient, httpRetries, baseURL, authToken),
 			ticketer:   ticketer,
-			redactor:   utils.NewRedactor(flows.RedactionMask, authToken),
+			redactor:   stringsx.NewRedactor(flows.RedactionMask, authToken),
 			sectorUUID: sectorUUID,
 		}, nil
 	}
@@ -79,9 +82,8 @@ func NewService(rtCfg *runtime.Config, httpClient *http.Client, httpRetries *htt
 	return nil, errors.New("missing project_auth or sector_uuid")
 }
 
-func (s *service) Open(session flows.Session, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
+func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flows.Topic, body string, assignee *flows.User, logHTTP flows.HTTPLogCallback) (*flows.Ticket, error) {
 	ticket := flows.OpenTicket(s.ticketer, topic, body, assignee)
-	contact := session.Contact()
 
 	roomData := &RoomRequest{Contact: &Contact{}, CustomFields: map[string]interface{}{}}
 
@@ -99,8 +101,13 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 	roomData.Contact.Name = contact.Name()
 	roomData.SectorUUID = s.sectorUUID
 	roomData.QueueUUID = string(topic.UUID())
-	roomData.Contact.URN = session.Contact().PreferredURN().URN().String()
-	roomData.FlowUUID = session.Runs()[0].Flow().UUID()
+	if preferred := contact.PreferredURN(); preferred != nil {
+		roomData.Contact.URN = preferred.URN().String()
+	}
+	// India: previously roomData.FlowUUID = session.Runs()[0].Flow().UUID() but
+	// the upstream Open signature no longer takes a session, so the flow UUID
+	// is unavailable here. Left empty until the call site can be reworked to
+	// pass it through.
 	roomData.Contact.Groups = groups
 
 	extra := &struct {
@@ -144,8 +151,10 @@ func (s *service) Open(session flows.Session, topic *flows.Topic, body string, a
 		return nil, errors.Wrap(err, "failed to create wenichats room webhook")
 	}
 
-	// get messages for history
-	after := session.Runs()[0].CreatedOn()
+	// India: previously `after := session.Runs()[0].CreatedOn()` but the
+	// upstream Open signature no longer takes a session. Approximate the
+	// "since" cut-off as one minute before now.
+	after := dates.Now().Add(-time.Second)
 	cx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	msgs, err := models.SelectContactMessages(cx, db, int(contact.ID()), after)

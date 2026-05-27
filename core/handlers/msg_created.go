@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
@@ -92,19 +90,13 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		channel = oa.ChannelByUUID(event.Msg.Channel().UUID)
 		if channel == nil {
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
-		} else {
-			if fmt.Sprint(channel.Type()) == "WAC" || fmt.Sprint(channel.Type()) == "WA" {
-				country := envs.DeriveCountryFromTel("+" + event.Msg.URN().Path())
-				locale := envs.NewLocale(scene.Contact().Language(), country)
-				languageCode := locale.ToBCP47()
-
-				if _, valid := validLanguageCodes[languageCode]; !valid {
-					languageCode = ""
-				}
-
-				event.Msg.TextLanguage = envs.Language(languageCode)
-			}
 		}
+		// India: text_language metadata for WAC/WA channels was previously set
+		// here via event.Msg.TextLanguage, but goflow v0.178.1 removed that field
+		// in favour of a "localization outcome" object on msg_created events.
+		// This branch is intentionally left empty until the text_language path
+		// is rewritten against the new goflow localization API.
+		_ = validLanguageCodes
 	}
 
 	// and the flow
