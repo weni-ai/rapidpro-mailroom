@@ -607,8 +607,7 @@ SELECT
 	channel_id,
 	contact_id,
 	contact_urn_id,
-	org_id,
-	topup_id
+	org_id
 FROM
 	msgs_msg
 WHERE

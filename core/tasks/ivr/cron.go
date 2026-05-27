@@ -310,22 +310,22 @@ const updateIVRChannelConfigSQL = `
 `
 
 const cancelQueuedChannelConnectionsSQL = `
-		UPDATE channels_channelconnection
+		UPDATE ivr_call
 		SET status = 'F'
 		WHERE id in (
 			SELECT id
-			FROM channels_channelconnection
+			FROM ivr_call
 			WHERE
 				(status = 'Q' OR status = 'E' OR status = 'P')
 		)
 `
 
 const clearStuckedChanelConnectionsSQL = `
-	UPDATE channels_channelconnection
+	UPDATE ivr_call
 	SET status = 'F' 
 	WHERE id in (
 		SELECT id
-		FROM channels_channelconnection
+		FROM ivr_call
 		WHERE  
 			(status = 'W' OR status = 'R' OR status = 'I') AND
 			modified_on < NOW() - INTERVAL '2 DAYS'
