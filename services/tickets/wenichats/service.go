@@ -150,7 +150,6 @@ func (s *service) Open(env envs.Environment, contact *flows.Contact, topic *flow
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create wenichats room webhook")
 	}
-
 	// India: previously `after := session.Runs()[0].CreatedOn()` but the
 	// upstream Open signature no longer takes a session. Approximate the
 	// "since" cut-off as one minute before now.
