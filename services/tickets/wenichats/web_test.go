@@ -6,11 +6,10 @@ import (
 
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
-	"github.com/nyaruka/mailroom/web"
 )
 
 func TestEventCallback(t *testing.T) {
-	ctx, rt, db, _ := testsuite.Get()
+	ctx, rt := testsuite.Runtime()
 	testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
 
 	defer testsuite.Reset(testsuite.ResetData | testsuite.ResetStorage)
@@ -18,7 +17,7 @@ func TestEventCallback(t *testing.T) {
 	// India: the Wenichats ticketer is not part of the upstream test
 	// database fixture (mailroom_test.dump) yet, so insert it on the fly.
 	// The config must satisfy wenichats.NewService validation.
-	db.MustExec(
+	rt.DB.MustExec(
 		`INSERT INTO tickets_ticketer (id, is_active, created_on, modified_on, uuid, ticketer_type, name, config, created_by_id, modified_by_id, org_id, is_system)
 		 VALUES ($1, TRUE, NOW(), NOW(), $2, 'wenichats', 'Wenichats',
 		 '{"project_auth": "sesame", "sector_uuid": "1a4bae05-993c-4f3b-91b5-80f4e09951f2"}',
@@ -28,7 +27,7 @@ func TestEventCallback(t *testing.T) {
 	)
 
 	ticket := testdata.InsertOpenTicket(
-		db,
+		rt,
 		testdata.Org1,
 		testdata.Cathy,
 		testdata.Wenichats,
@@ -39,5 +38,5 @@ func TestEventCallback(t *testing.T) {
 		nil,
 	)
 
-	web.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
+	testsuite.RunWebTests(t, ctx, rt, "testdata/event_callback.json", map[string]string{"cathy_ticket_uuid": string(ticket.UUID)})
 }
