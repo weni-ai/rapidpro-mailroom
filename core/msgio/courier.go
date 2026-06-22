@@ -283,7 +283,20 @@ func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channe
 	if err != nil {
 		return "", "", errors.Wrap(err, "error calling courier endpoint")
 	}
-	if resp.Response.StatusCode != 200 {
+
+	statusCode := resp.Response.StatusCode
+	if statusCode == http.StatusNotFound {
+		logrus.WithFields(logrus.Fields{
+			"channel_uuid": ch.UUID(),
+			"msg_id":       msgID,
+			"url":          attURL,
+		}).Warn("attachment unavailable, media expired or removed")
+		return utils.Attachment(fmt.Sprintf("%s:%s", utils.UnavailableType, attURL)), "", nil
+	}
+	if statusCode/100 == 5 {
+		return "", "", errors.Errorf("error calling courier endpoint, got server error status: %s", string(resp.ResponseTrace))
+	}
+	if statusCode != http.StatusOK {
 		return "", "", errors.Errorf("error calling courier endpoint, got non-200 status: %s", string(resp.ResponseTrace))
 	}
 	fa := &fetchAttachmentResponse{}
