@@ -303,11 +303,7 @@ func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channe
 
 	statusCode := resp.Response.StatusCode
 	if statusCode == http.StatusNotFound {
-		logrus.WithFields(logrus.Fields{
-			"channel_uuid": ch.UUID(),
-			"msg_id":       msgID,
-			"url":          attURL,
-		}).Warn("attachment unavailable, media expired or removed")
+		slog.Warn("attachment unavailable, media expired or removed", "channel_uuid", ch.UUID(), "msg_id", msgID, "url", attURL)
 		return utils.Attachment(fmt.Sprintf("%s:%s", utils.UnavailableType, attURL)), "", nil
 	}
 	if statusCode/100 == 5 {
