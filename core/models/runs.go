@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/null/v2"
+	"github.com/nyaruka/null/v3"
 	"github.com/pkg/errors"
 )
 
@@ -141,80 +140,3 @@ func newRun(ctx context.Context, tx *sqlx.Tx, oa *OrgAssets, session *Session, f
 
 	return run, nil
 }
-
-// FindFlowStartedOverlap returns the list of contact ids which overlap with those passed in and which
-// have been in the flow passed in.
-func FindFlowStartedOverlap(ctx context.Context, db *sqlx.DB, flowID FlowID, contacts []ContactID) ([]ContactID, error) {
-	var overlap []ContactID
-	err := db.SelectContext(ctx, &overlap, flowStartedOverlapSQL, pq.Array(contacts), flowID)
-	return overlap, err
-}
-
-// TODO: no perfect index, will probably use contact index flows_flowrun_contact_id_985792a9
-// could be slow in the cases of contacts having many distinct runs
-const flowStartedOverlapSQL = `
-SELECT
-	DISTINCT(contact_id)
-FROM
-	flows_flowrun
-WHERE
-	contact_id = ANY($1) AND
-	flow_id = $2
-`
-
-// ExpireRunsAndSessions expires all the passed in runs and sessions. Note this should only be called
-// for runs that have no parents or no way of continuing
-func ExpireRunsAndSessions(ctx context.Context, db *sqlx.DB, runIDs []FlowRunID, sessionIDs []SessionID) error {
-	if len(runIDs) == 0 {
-		return nil
-	}
-
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return errors.Wrapf(err, "error starting transaction to expire sessions")
-	}
-
-	err = Exec(ctx, "expiring runs", tx, expireRunsSQL, pq.Array(runIDs))
-	if err != nil {
-		tx.Rollback()
-		return errors.Wrapf(err, "error expiring runs")
-	}
-
-	if len(sessionIDs) > 0 {
-		err = Exec(ctx, "expiring sessions", tx, expireSessionsSQL, pq.Array(sessionIDs))
-		if err != nil {
-			tx.Rollback()
-			return errors.Wrapf(err, "error expiring sessions")
-		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrapf(err, "error committing expiration of runs and sessions")
-	}
-	return nil
-}
-
-const expireSessionsSQL = `
-	UPDATE
-		flows_flowsession s
-	SET
-		timeout_on = NULL,
-		ended_on = NOW(),
-		status = 'X'
-	WHERE
-		id = ANY($1)
-`
-
-const expireRunsSQL = `
-	UPDATE
-		flows_flowrun fr
-	SET
-		is_active = FALSE,
-		exited_on = NOW(),
-		exit_type = 'E',
-		status = 'E',
-		modified_on = NOW()
-	WHERE
-		id = ANY($1)
-`

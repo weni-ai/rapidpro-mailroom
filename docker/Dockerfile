@@ -1,10 +1,8 @@
-FROM golang:1.19-alpine3.17
+FROM golang:1.21-alpine
 
 WORKDIR /app
 
-RUN apk update \
-  && apk add --virtual build-deps gcc git curl tar \
-  && rm -rf /var/cache/apk/*
+RUN apk add --no-cache build-base git curl tar
 
 RUN addgroup -S golang \
   && adduser -S -G golang golang

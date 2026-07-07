@@ -1,16 +1,16 @@
 # TextIt Mailroom
 
-[![Build Status](https://github.com/rapidpro/mailroom/workflows/CI/badge.svg)](https://github.com/rapidpro/mailroom/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/rapidpro/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/rapidpro/mailroom)
+[![Build Status](https://github.com/nyaruka/mailroom/workflows/CI/badge.svg)](https://github.com/nyaruka/mailroom/actions?query=workflow%3ACI)
+[![codecov](https://codecov.io/gh/nyaruka/mailroom/branch/main/graph/badge.svg)](https://codecov.io/gh/nyaruka/mailroom)
 
-Service for TextIt which does the heavy lifting of running flow starts, campaigns etc. It interacts directly with the database 
-and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
+Service for RapidPro/TextIt which does the heavy lifting of running flow starts, campaigns etc. It interacts directly 
+with the database and sends and receives messages with [Courier](https://github.com/nyaruka/courier) for handling via Redis.
 
 ## Deploying
 
 As a Go application, it compiles to a binary and that binary along with the config file is all
 you need to run it on your server. You can find bundles for each platform in the
-[releases directory](https://github.com/rapidpro/mailroom/releases). We recommend running it
+[releases directory](https://github.com/nyaruka/mailroom/releases). We recommend running it
 behind a reverse proxy such as nginx or Elastic Load Balancer that provides HTTPs encryption.
 
 ## Configuration
@@ -25,7 +25,7 @@ We recommend running it with no changes to the configuration and no parameters, 
 environment variables to configure it. You can use `% mailroom --help` to see a list of the
 environment variables and parameters and for more details on each option.
 
-For use with TextIt, you will need to configure these settings:
+For use with RapidPro/TextIt, you will need to configure these settings:
 
 - `MAILROOM_ADDRESS`: the address to bind our web server to (default "localhost")
 - `MAILROOM_DOMAIN`: the domain that mailroom is listening on
@@ -72,7 +72,7 @@ Recommended settings for error and performance monitoring:
 Once you've checked out the code, you can build the service with:
 
 ```
-go build github.com/rapidpro/mailroom/cmd/mailroom
+go build github.com/nyaruka/mailroom/cmd/mailroom
 ```
 
 This will create a new executable in $GOPATH/bin called `mailroom`.

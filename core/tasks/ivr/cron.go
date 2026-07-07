@@ -2,136 +2,37 @@ package ivr
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
+	"log/slog"
 	"time"
 
-	"github.com/nyaruka/gocommon/dbutil"
-	"github.com/nyaruka/mailroom"
 	"github.com/nyaruka/mailroom/core/ivr"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
-
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
-
-const (
-	retryIVRLock           = "retry_ivr_calls"
-	clearIVRLock           = "clear_ivr_connections"
-	changeMaxConnNightLock = "change_ivr_max_conn_night"
-	changeMaxConnDayLock   = "change_ivr_max_conn_day"
-	cancelIVRCallsLock     = "cancel_ivr_calls"
-)
-
-var locationTimezone *time.Location
 
 func init() {
-	mailroom.RegisterCron("retry_ivr_calls", time.Minute, false, func(ctx context.Context, rt *runtime.Runtime) error {
-		if err := SetupLocationTimezone(rt.Config.IVRTimeZone); err != nil {
-			return err
-		}
-		currentHour := time.Now().In(locationTimezone).Hour()
-		if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*time.Duration(rt.Config.IVRRetryTimeout))
-			defer cancel()
-			return RetryCallsInWorkerPool(ctx, rt)
-		}
-		return nil
-	})
-
-	mailroom.RegisterCron(clearIVRLock, time.Hour, false, ClearStuckChannelConnections)
-
-	mailroom.RegisterCron(changeMaxConnNightLock, time.Minute*10, false, func(ctx context.Context, rt *runtime.Runtime) error {
-		if err := SetupLocationTimezone(rt.Config.IVRTimeZone); err != nil {
-			return err
-		}
-		currentHour := time.Now().In(locationTimezone).Hour()
-		if currentHour >= rt.Config.IVRStopHour || currentHour < rt.Config.IVRStartHour {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
-			defer cancel()
-			return ChangeMaxConnectionsConfig(ctx, rt, "TW", 0)
-		}
-		return nil
-	})
-
-	mailroom.RegisterCron(changeMaxConnDayLock, time.Minute*10, false, func(ctx context.Context, rt *runtime.Runtime) error {
-		if err := SetupLocationTimezone(rt.Config.IVRTimeZone); err != nil {
-			return err
-		}
-		currentHour := time.Now().In(locationTimezone).Hour()
-		if currentHour >= rt.Config.IVRStartHour && currentHour < rt.Config.IVRStopHour {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
-			defer cancel()
-			return ChangeMaxConnectionsConfig(ctx, rt, "TW", rt.Config.MaxConcurrentEvents)
-		}
-		return nil
-	})
-
-	mailroom.RegisterCron(cancelIVRCallsLock, time.Hour*1, false, func(ctx context.Context, rt *runtime.Runtime) error {
-		if err := SetupLocationTimezone(rt.Config.IVRTimeZone); err != nil {
-			return err
-		}
-		currentHour := time.Now().In(locationTimezone).Hour()
-		if currentHour == rt.Config.IVRCancelCronStartHour {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
-			defer cancel()
-			return CancelCalls(ctx, rt)
-		}
-		return nil
-	})
+	tasks.RegisterCron("retry_ivr_calls", false, &RetryCron{})
 }
 
-// retryCallsInWorkerPoll looks for calls that need to be retried and retries then
-func RetryCallsInWorkerPool(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "ivr_cron_retryer")
-	start := time.Now()
+type RetryCron struct{}
 
-	conns, err := models.LoadCallsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
-	if err != nil {
-		return errors.Wrapf(err, "error loading connections to retry")
-	}
-
-	var jobs []Job
-	for i := 0; i < len(conns); i++ {
-		jobs = append(jobs, Job{Id: i, Conn: conns[i]})
-	}
-
-	var (
-		wg         sync.WaitGroup
-		jobChannel = make(chan Job)
-	)
-
-	wg.Add(rt.Config.IVRRetryWorkers)
-
-	for i := 0; i < rt.Config.IVRRetryWorkers; i++ {
-		go HandleWork(i, rt, &wg, jobChannel)
-	}
-
-	for _, job := range jobs {
-		jobChannel <- job
-	}
-
-	close(jobChannel)
-	wg.Wait()
-
-	log.WithField("count", len(conns)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
-
-	return nil
+func (c *RetryCron) Next(last time.Time) time.Time {
+	return tasks.CronNext(last, time.Minute)
 }
 
 // RetryCalls looks for calls that need to be retried and retries them
-func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "ivr_cron_retryer")
-	start := time.Now()
+func (c *RetryCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]any, error) {
+	log := slog.With("comp", "ivr_cron_retryer")
 
 	// find all calls that need restarting
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	calls, err := models.LoadCallsToRetry(ctx, rt.DB, rt.Config.IVRConnRetryLimit)
+	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 100)
 	if err != nil {
-		return errors.Wrapf(err, "error loading calls to retry")
+		return nil, errors.Wrapf(err, "error loading calls to retry")
 	}
 
 	throttledChannels := make(map[models.ChannelID]bool)
@@ -139,19 +40,19 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 
 	// schedules requests for each call
 	for _, call := range calls {
-		log = log.WithField("call_id", call.ID())
+		log = log.With("call_id", call.ID())
 
-		// India: throttle check intentionally disabled (kept here for reference)
-		/*if throttledChannels[call.ChannelID()] {
+		// if the channel for this call is throttled, move on
+		if throttledChannels[call.ChannelID()] {
 			call.MarkThrottled(ctx, rt.DB, time.Now())
-			log.WithField("channel_id", call.ChannelID()).Info("skipping call, throttled")
+			log.Info("skipping call, throttled", "channel_id", call.ChannelID())
 			continue
-		}*/
+		}
 
 		// load the org for this call
 		oa, err := models.GetOrgAssets(ctx, rt, call.OrgID())
 		if err != nil {
-			log.WithError(err).WithField("org_id", call.OrgID()).Error("error loading org")
+			log.Error("error loading org", "error", err, "org_id", call.OrgID())
 			continue
 		}
 
@@ -161,7 +62,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 			// fail this call, channel is no longer active
 			err = models.BulkUpdateCallStatuses(ctx, rt.DB, []models.CallID{call.ID()}, models.CallStatusFailed)
 			if err != nil {
-				log.WithError(err).WithField("channel_id", call.ChannelID()).Error("error marking call as failed due to missing channel")
+				log.Error("error marking call as failed due to missing channel", "error", err, "channel_id", call.ChannelID())
 			}
 			continue
 		}
@@ -169,7 +70,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 		// finally load the full URN
 		urn, err := models.URNForID(ctx, rt.DB, oa, call.ContactURNID())
 		if err != nil {
-			log.WithError(err).WithField("urn_id", call.ContactURNID()).Error("unable to load contact urn")
+			log.Error("unable to load contact urn", "error", err, "urn_id", call.ContactURNID())
 			continue
 		}
 
@@ -178,7 +79,7 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 			clogs = append(clogs, clog)
 		}
 		if err != nil {
-			log.WithError(err).Error(err)
+			log.Error("error requesting start for call", "error", err)
 			continue
 		}
 
@@ -188,171 +89,8 @@ func RetryCalls(ctx context.Context, rt *runtime.Runtime) error {
 
 	// log any error inserting our channel logs, but continue
 	if err := models.InsertChannelLogs(ctx, rt, clogs); err != nil {
-		logrus.WithError(err).Error("error inserting channel logs")
+		slog.Error("error inserting channel logs", "error", err)
 	}
 
-	log.WithField("count", len(calls)).WithField("elapsed", time.Since(start)).Info("retried errored calls")
-
-	return nil
-}
-
-func ClearStuckChannelConnections(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "ivr_cron_cleaner")
-	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
-	result, err := rt.DB.ExecContext(ctx, clearStuckedChanelConnectionsSQL)
-	if err != nil {
-		return errors.Wrapf(err, "error cleaning stucked connections")
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "error getting rows affected on cleaning stucked connections")
-	}
-	if rowsAffected > 0 {
-		log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("stucked channel connections")
-	}
-	return nil
-}
-
-func CancelCalls(ctx context.Context, rt *runtime.Runtime) error {
-	log := logrus.WithField("comp", "ivr_cron_canceler")
-	start := time.Now()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*15)
-	defer cancel()
-
-	result, err := rt.DB.ExecContext(ctx, cancelQueuedChannelConnectionsSQL)
-	if err != nil {
-		return errors.Wrapf(err, "error canceling remaining connection calls")
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return errors.Wrapf(err, "error getting rows affected on cleaning stucked connections")
-	}
-	if rowsAffected > 0 {
-		log.WithField("count", rowsAffected).WithField("elapsed", time.Since(start)).Info("stucked channel connections")
-	}
-	return nil
-}
-
-func ChangeMaxConnectionsConfig(ctx context.Context, rt *runtime.Runtime, channelType string, maxConcurrentEventsToSet int) error {
-	log := logrus.WithField("comp", "ivr_cron_change_max_connections")
-	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
-	rows, err := rt.DB.QueryxContext(ctx, selectIVRTWTypeChannelsSQL, channelType)
-	if err != nil {
-		return errors.Wrapf(err, "error querying for channels")
-	}
-	defer rows.Close()
-
-	ivrChannels := make([]Channel, 0)
-
-	for rows.Next() {
-		ch := Channel{}
-		err := dbutil.ScanJSON(rows, &ch)
-		if err != nil {
-			return errors.Wrapf(err, "error scanning channel")
-		}
-
-		ivrChannels = append(ivrChannels, ch)
-	}
-
-	for _, ch := range ivrChannels {
-
-		if ch.Config["max_concurrent_events"] == maxConcurrentEventsToSet {
-			return nil
-		}
-
-		ch.Config["max_concurrent_events"] = maxConcurrentEventsToSet
-
-		configJSON, err := json.Marshal(ch.Config)
-		if err != nil {
-			return errors.Wrapf(err, "error marshalling channels config")
-		}
-
-		_, err = rt.DB.ExecContext(ctx, updateIVRChannelConfigSQL, string(configJSON), ch.ID)
-		if err != nil {
-			return errors.Wrapf(err, "error updating channels config")
-		}
-	}
-
-	log.WithField("count", len(ivrChannels)).WithField("elapsed", time.Since(start)).Info("channels that have max_concurrent_events updated")
-
-	return nil
-}
-
-const selectIVRTWTypeChannelsSQL = `
-	SELECT ROW_TO_JSON(r) FROM (
-		SELECT 
-			c.id, 
-			c.uuid, 
-			c.channel_type, 
-			COALESCE(c.config, '{}')::json as config, 
-			c.is_active 
-		FROM 
-			channels_channel as c 
-		WHERE 
-			c.channel_type = $1 AND 
-			c.is_active = TRUE ) r;
-`
-
-const updateIVRChannelConfigSQL = `
-	UPDATE channels_channel
-	SET config = $1
-	WHERE id = $2
-`
-
-const cancelQueuedChannelConnectionsSQL = `
-		UPDATE ivr_call
-		SET status = 'F'
-		WHERE id in (
-			SELECT id
-			FROM ivr_call
-			WHERE
-				(status = 'Q' OR status = 'E' OR status = 'P')
-		)
-`
-
-const clearStuckedChanelConnectionsSQL = `
-	UPDATE ivr_call
-	SET status = 'F' 
-	WHERE id in (
-		SELECT id
-		FROM ivr_call
-		WHERE  
-			(status = 'W' OR status = 'R' OR status = 'I') AND
-			modified_on < NOW() - INTERVAL '2 DAYS'
-		LIMIT  100
-	)
-`
-
-type Channel struct {
-	ID          int                    `db:"id" json:"id,omitempty"`
-	UUID        string                 `db:"uuid" json:"uuid,omitempty"`
-	ChannelType string                 `db:"channel_type" json:"channel_type,omitempty"`
-	Config      map[string]interface{} `db:"config" json:"config,omitempty"`
-	IsActive    bool                   `db:"is_active" json:"is_active,omitempty"`
-}
-
-func SetupLocationTimezone(timezone string) error {
-	if locationTimezone != nil {
-		return nil
-	}
-	var err error
-	locationTimezone, err = time.LoadLocation(timezone)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func GetLocationTimezone() *time.Location {
-	return locationTimezone
+	return map[string]any{"retried": len(calls)}, nil
 }

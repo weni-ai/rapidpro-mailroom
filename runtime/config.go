@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/pkg/errors"
 )
@@ -53,16 +54,14 @@ type Config struct {
 	ElasticPassword      string `help:"the password for ElasticSearch if using basic auth"`
 	ElasticContactsIndex string `help:"the name of index alias for contacts"`
 
-	S3Endpoint           string `help:"the S3 endpoint we will write attachments to"`
-	S3Region             string `help:"the S3 region we will write attachments to"`
-	S3AttachmentsBucket  string `help:"the S3 bucket we will write attachments to"`
-	S3AttachmentsPrefix  string `help:"the prefix that will be added to attachment filenames"`
-	S3SessionsBucket     string `help:"the S3 bucket we will write attachments to"`
-	S3SessionPrefix      string `help:"the prefix that will be added to attachment filenames"`
-	S3LogsBucket         string `help:"the S3 bucket we will write logs to"`
-	S3MediaPrefixZendesk string `help:"the prefix that will be added to file attachment names for Zendesk tickets"`
-	S3DisableSSL         bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
-	S3ForcePathStyle     bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
+	S3Endpoint          string `help:"the S3 endpoint we will write attachments to"`
+	S3Region            string `help:"the S3 region we will write attachments to"`
+	S3AttachmentsBucket string `help:"the S3 bucket we will write attachments to"`
+	S3AttachmentsPrefix string `help:"the prefix that will be added to attachment filenames"`
+	S3SessionsBucket    string `help:"the S3 bucket we will write attachments to"`
+	S3LogsBucket        string `help:"the S3 bucket we will write logs to"`
+	S3DisableSSL        bool   `help:"whether we disable SSL when accessing S3. Should always be set to False unless you're hosting an S3 compatible service within a secure internal network"`
+	S3ForcePathStyle    bool   `help:"whether we force S3 path style. Should generally need to default to False unless you're hosting an S3 compatible service"`
 
 	AWSAccessKeyID     string `help:"the access key id to use when authenticating S3"`
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
@@ -78,23 +77,6 @@ type Config struct {
 	LogLevel     string `help:"the logging level courier should use"`
 	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
 	Version      string `help:"the version of this mailroom install"`
-
-	TimeoutTime           int    `help:"the amount of time to between every timeout queued"`
-	WenichatsServiceURL   string `help:"wenichats external api url for ticketer service integration"`
-	FlowStartBatchTimeout int    `help:"timeout config for flow start batch"`
-
-	MaxConcurrentEvents                  int    `help:"ivr max concurrent events limit to set when on day time period of activity of ivr channels"`
-	IVRStartHour                         int    `help:"ivr start hour"`
-	IVRStopHour                          int    `help:"ivr stop hour"`
-	IVRTimeZone                          string `help:"ivr time zone"`
-	IVRCancelCronStartHour               int    `help:"the cron hour to start cancel ivr calls queued"`
-	IVRFlowStartBatchTimeout             int    `help:"timeout of flow start batch"`
-	IVRFlowStartBatchExecutionsPerSecond int    `help:"executions per second of flow start batch calls"`
-
-	IVRConnRetryLimit                  int `help:"limit connection that be retryed"`
-	IVRRetryWorkers                    int `help:"the number of goroutines that will be used to handle each connection retry"`
-	IVRRetryTimeout                    int `help:"timeout to run a retry ivr connections"`
-	IVRRetryMaximumExecutionsPerSecond int `help:"maximum executions per second of retry calls"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -150,23 +132,6 @@ func NewDefaultConfig() *Config {
 		LogLevel:     "error",
 		UUIDSeed:     0,
 		Version:      "Dev",
-
-		TimeoutTime:           60,
-		WenichatsServiceURL:   "https://chats-engine.dev.cloud.weni.ai/v1/external",
-		FlowStartBatchTimeout: 15,
-
-		MaxConcurrentEvents:                  1500,
-		IVRStartHour:                         8,
-		IVRStopHour:                          21,
-		IVRTimeZone:                          "Asia/Kolkata",
-		IVRCancelCronStartHour:               22,
-		IVRFlowStartBatchTimeout:             15,
-		IVRFlowStartBatchExecutionsPerSecond: 50,
-
-		IVRConnRetryLimit:                  500,
-		IVRRetryWorkers:                    5,
-		IVRRetryTimeout:                    10,
-		IVRRetryMaximumExecutionsPerSecond: 10,
 	}
 }
 
@@ -189,24 +154,5 @@ func (c *Config) ParseDisallowedNetworks() ([]net.IP, []*net.IPNet, error) {
 		return nil, nil, err
 	}
 
-	ips := make([]net.IP, 0, len(addrs))
-	ipNets := make([]*net.IPNet, 0, len(addrs))
-
-	for _, addr := range addrs {
-		if strings.Contains(addr, "/") {
-			_, ipNet, err := net.ParseCIDR(addr)
-			if err != nil {
-				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP network", addr)
-			}
-			ipNets = append(ipNets, ipNet)
-		} else {
-			ip := net.ParseIP(addr)
-			if ip == nil {
-				return nil, nil, errors.Errorf("couldn't parse '%s' as an IP address", addr)
-			}
-			ips = append(ips, ip)
-		}
-	}
-
-	return ips, ipNets, nil
+	return httpx.ParseNetworks(addrs...)
 }

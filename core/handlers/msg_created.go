@@ -2,17 +2,16 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/mailroom/core/hooks"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
-
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -64,12 +63,7 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		return errors.Errorf("cannot handle msg created event without session")
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"contact_uuid": scene.ContactUUID(),
-		"session_id":   scene.SessionID(),
-		"text":         event.Msg.Text(),
-		"urn":          event.Msg.URN(),
-	}).Debug("msg created event")
+	slog.Debug("msg created", "contact", scene.ContactUUID(), "session", scene.SessionID(), "text", event.Msg.Text(), "urn", event.Msg.URN())
 
 	// messages in messaging flows must have urn id set on them, if not, go look it up
 	if scene.Session().SessionType() == models.FlowTypeMessaging && event.Msg.URN() != urns.NilURN {
@@ -91,12 +85,6 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		if channel == nil {
 			return errors.Errorf("unable to load channel with uuid: %s", event.Msg.Channel().UUID)
 		}
-		// India: text_language metadata for WAC/WA channels was previously set
-		// here via event.Msg.TextLanguage, but goflow v0.178.1 removed that field
-		// in favour of a "localization outcome" object on msg_created events.
-		// This branch is intentionally left empty until the text_language path
-		// is rewritten against the new goflow localization API.
-		_ = validLanguageCodes
 	}
 
 	// and the flow
@@ -107,7 +95,12 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 		flow = flowAsset.(*models.Flow)
 	}
 
-	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), flow, event.Msg, event.CreatedOn())
+	var tpl *models.Template
+	if event.Msg.Templating() != nil {
+		tpl = oa.TemplateByUUID(event.Msg.Templating().Template().UUID)
+	}
+
+	msg, err := models.NewOutgoingFlowMsg(rt, oa.Org(), channel, scene.Session(), flow, event.Msg, tpl, event.CreatedOn())
 	if err != nil {
 		return errors.Wrapf(err, "error creating outgoing message to %s", event.Msg.URN())
 	}
@@ -121,33 +114,4 @@ func handleMsgCreated(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa 
 	}
 
 	return nil
-}
-
-var validLanguageCodes = map[string]bool{
-	"da-DK": true,
-	"de-DE": true,
-	"en-AU": true,
-	"en-CA": true,
-	"en-GB": true,
-	"en-IN": true,
-	"en-US": true,
-	"ca-ES": true,
-	"es-ES": true,
-	"es-MX": true,
-	"fi-FI": true,
-	"fr-CA": true,
-	"fr-FR": true,
-	"it-IT": true,
-	"ja-JP": true,
-	"ko-KR": true,
-	"nb-NO": true,
-	"nl-NL": true,
-	"pl-PL": true,
-	"pt-BR": true,
-	"ru-RU": true,
-	"sv-SE": true,
-	"zh-CN": true,
-	"zh-HK": true,
-	"zh-TW": true,
-	"ar-JO": true,
 }
