@@ -37,14 +37,16 @@ func TestCreate(t *testing.T) {
 	testsuite.RunWebTests(t, ctx, rt, "testdata/create.json", nil)
 }
 
-func TestBulkCreate(t *testing.T) {
+func TestExport(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/export.json", nil)
+}
 
-	rt.DB.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
+func TestExportPreview(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
 
-	testsuite.RunWebTests(t, ctx, rt, "testdata/bulk_create.json", nil)
+	testsuite.RunWebTests(t, ctx, rt, "testdata/export_preview.json", nil)
 }
 
 func TestInspect(t *testing.T) {
@@ -84,19 +86,6 @@ func TestModify(t *testing.T) {
 	models.LockContacts(ctx, rt, testdata.Org1.ID, []models.ContactID{testdata.Alexandria.ID}, time.Second)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/modify.json", nil)
-}
-
-func TestResolve(t *testing.T) {
-	ctx, rt := testsuite.Runtime()
-
-	defer testsuite.Reset(testsuite.ResetAll)
-
-	// detach Cathy's tel URN
-	rt.DB.MustExec(`UPDATE contacts_contacturn SET contact_id = NULL WHERE contact_id = $1`, testdata.Cathy.ID)
-
-	rt.DB.MustExec(`ALTER SEQUENCE contacts_contact_id_seq RESTART WITH 30000`)
-
-	testsuite.RunWebTests(t, ctx, rt, "testdata/resolve.json", nil)
 }
 
 func TestInterrupt(t *testing.T) {
@@ -152,14 +141,14 @@ func TestSearch(t *testing.T) {
 			method:         "POST",
 			url:            "/mr/contact/search",
 			body:           fmt.Sprintf(`{"org_id": 1, "query": "birthday = tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
-			expectedStatus: 400,
+			expectedStatus: 422,
 			expectedError:  "can't resolve 'birthday' to attribute, scheme or field",
 		},
 		{ // 2
 			method:         "POST",
 			url:            "/mr/contact/search",
 			body:           fmt.Sprintf(`{"org_id": 1, "query": "age > tomorrow", "group_id": %d}`, testdata.ActiveGroup.ID),
-			expectedStatus: 400,
+			expectedStatus: 422,
 			expectedError:  "can't convert 'tomorrow' to a number",
 		},
 		{ // 3
@@ -192,7 +181,7 @@ func TestSearch(t *testing.T) {
 			body:               fmt.Sprintf(`{"org_id": 1, "query": "AGE = 10 and gender = M", "group_id": %d}`, testdata.ActiveGroup.ID),
 			expectedStatus:     200,
 			expectedHits:       []models.ContactID{},
-			expectedQuery:      `age = 10 AND gender = "M"`,
+			expectedQuery:      `fields.age = 10 AND fields.gender = "M"`,
 			expectedAttributes: []string{},
 			expectedFields: []*assets.FieldReference{
 				assets.NewFieldReference("age", "Age"),
@@ -221,7 +210,7 @@ func TestSearch(t *testing.T) {
 			body = bytes.NewReader([]byte(tc.body))
 		}
 
-		req, err := http.NewRequest(tc.method, "http://localhost:8090"+tc.url, body)
+		req, err := http.NewRequest(tc.method, "http://localhost:8091"+tc.url, body)
 		assert.NoError(t, err, "%d: error creating request", i)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -261,6 +250,12 @@ func TestParseQuery(t *testing.T) {
 	defer testsuite.Reset(testsuite.ResetAll)
 
 	testsuite.RunWebTests(t, ctx, rt, "testdata/parse_query.json", nil)
+}
+
+func TestURNs(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	testsuite.RunWebTests(t, ctx, rt, "testdata/urns.json", nil)
 }
 
 func TestSpecToCreation(t *testing.T) {

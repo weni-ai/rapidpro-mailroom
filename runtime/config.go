@@ -2,15 +2,18 @@ package runtime
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/nyaruka/ezconf"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -42,7 +45,7 @@ type Config struct {
 	WebhooksBackoffJitter        float64 `help:"the amount of jitter to apply to backoff times"`
 	WebhooksHealthyResponseLimit int     `help:"the limit in milliseconds for webhook response to be considered healthy"`
 
-	SMTPServer           string `help:"the smtp configuration for sending emails ex: smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	SMTPServer           string `help:"the default SMTP configuration for sending flow emails, e.g. smtp://user%40password@server:port/?from=foo%40gmail.com"`
 	DisallowedNetworks   string `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
 	MaxStepsPerSprint    int    `help:"the maximum number of steps allowed per engine sprint"`
 	MaxResumesPerSession int    `help:"the maximum number of resumes allowed per engine session"`
@@ -67,16 +70,16 @@ type Config struct {
 	AWSSecretAccessKey string `help:"the secret access key id to use when authenticating S3"`
 	AWSUseCredChain    bool   `help:"whether to use the AWS credentials chain. Defaults to false."`
 
-	CourierAuthToken  string `help:"the authentication token used for requests to Courier"`
-	LibratoUsername   string `help:"the username that will be used to authenticate to Librato"`
-	LibratoToken      string `help:"the token that will be used to authenticate to Librato"`
-	FCMKey            string `help:"the FCM API key used to notify Android relayers to sync"`
-	MailgunSigningKey string `help:"the signing key used to validate requests from mailgun"`
+	CourierAuthToken string `help:"the authentication token used for requests to Courier"`
+	LibratoUsername  string `help:"the username that will be used to authenticate to Librato"`
+	LibratoToken     string `help:"the token that will be used to authenticate to Librato"`
 
-	InstanceName string `help:"the unique name of this instance used for analytics"`
-	LogLevel     string `help:"the logging level courier should use"`
-	UUIDSeed     int    `help:"seed to use for UUID generation in a testing environment"`
-	Version      string `help:"the version of this mailroom install"`
+	AndroidFCMServiceAccountFile string `help:"the FCM Service Account Credentials JSON File path used to notify Android relayers to sync"`
+
+	InstanceID string     `help:"the unique identifier of this instance, defaults to hostname"`
+	LogLevel   slog.Level `help:"the logging level courier should use"`
+	UUIDSeed   int        `help:"seed to use for UUID generation in a testing environment"`
+	Version    string     `help:"the version of this mailroom install"`
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -128,11 +131,24 @@ func NewDefaultConfig() *Config {
 		AWSSecretAccessKey: "",
 		AWSUseCredChain:    false,
 
-		InstanceName: hostname,
-		LogLevel:     "error",
-		UUIDSeed:     0,
-		Version:      "Dev",
+		InstanceID: hostname,
+		LogLevel:   slog.LevelWarn,
+		UUIDSeed:   0,
+		Version:    "Dev",
 	}
+}
+
+func LoadConfig() *Config {
+	config := NewDefaultConfig()
+	loader := ezconf.NewLoader(config, "mailroom", "Mailroom - handler for RapidPro", []string{"mailroom.toml"})
+	loader.MustLoad()
+
+	// ensure config is valid
+	if err := config.Validate(); err != nil {
+		log.Fatalf("invalid config: %s", err)
+	}
+
+	return config
 }
 
 // Validate validates the config
@@ -142,7 +158,7 @@ func (c *Config) Validate() error {
 	}
 
 	if _, _, err := c.ParseDisallowedNetworks(); err != nil {
-		return errors.Wrap(err, "unable to parse 'DisallowedNetworks'")
+		return fmt.Errorf("unable to parse 'DisallowedNetworks': %w", err)
 	}
 	return nil
 }
