@@ -2,6 +2,7 @@ package contact
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/nyaruka/goflow/assets"
@@ -10,7 +11,6 @@ import (
 	"github.com/nyaruka/mailroom/core/search"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -63,20 +63,15 @@ type SearchResponse struct {
 func handleSearch(ctx context.Context, rt *runtime.Runtime, r *searchRequest) (any, int, error) {
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, r.OrgID, models.RefreshFields|models.RefreshGroups)
 	if err != nil {
-		return nil, 0, errors.Wrapf(err, "unable to load org assets")
+		return nil, 0, fmt.Errorf("unable to load org assets: %w", err)
 	}
 
 	group := oa.GroupByID(r.GroupID)
 
 	// perform our search
 	parsed, hits, total, err := search.GetContactIDsForQueryPage(ctx, rt, oa, group, r.ExcludeIDs, r.Query, r.Sort, r.Offset, 50)
-
 	if err != nil {
-		isQueryError, qerr := contactql.IsQueryError(err)
-		if isQueryError {
-			return qerr, http.StatusBadRequest, nil
-		}
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("error searching page: %w", err)
 	}
 
 	// normalize and inspect the query
