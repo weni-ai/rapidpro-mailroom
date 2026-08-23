@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/utils/clogs"
 	"github.com/nyaruka/null/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,12 +51,12 @@ func TestFetchAttachment(t *testing.T) {
 	att, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.NoError(t, err)
 	assert.Equal(t, utils.Attachment("image/jpeg:https://backend.com/image.jpg"), att)
-	assert.Equal(t, models.ChannelLogUUID("547deaf7-7620-4434-95b3-58675999c4b7"), logUUID)
+	assert.Equal(t, clogs.LogUUID("547deaf7-7620-4434-95b3-58675999c4b7"), logUUID)
 
 	att, logUUID, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.NoError(t, err)
 	assert.Equal(t, utils.Attachment("unavailable:https://example.com/media/123"), att)
-	assert.Equal(t, models.ChannelLogUUID(""), logUUID)
+	assert.Equal(t, clogs.LogUUID(""), logUUID)
 
 	_, _, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.Error(t, err)
