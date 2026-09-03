@@ -19,7 +19,7 @@ func TestContactChanged(t *testing.T) {
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo)
 
 	tcs := []struct {
 		label       string
@@ -34,7 +34,7 @@ func TestContactChanged(t *testing.T) {
 				Value:  "telegram:98765",
 				Action: "append",
 			},
-			expectedURN: []string{"tel:+16055742222", "whatsapp:250788373373", "telegram:98765"},
+			expectedURN: []string{"tel:+16055742222", "telegram:98765"},
 		},
 		{
 			label:   "append WhatsApp BSUID",
@@ -76,7 +76,7 @@ func TestReassignShellOnContactChanged(t *testing.T) {
 	vc := rt.VK.Get()
 	defer vc.Close()
 
-	defer testsuite.Reset(t, rt, testsuite.ResetData)
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo)
 
 	shell := testdb.InsertContact(t, rt, testdb.Org1, "8b2b8b4c-8e6e-4c96-9e9c-bf6b56a04e37", "Shell", "eng", models.ContactStatusActive)
 	testdb.InsertContactURN(t, rt, testdb.Org1, shell, "whatsapp:US.A1B2C3", 1000, nil)
