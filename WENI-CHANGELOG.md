@@ -1,18 +1,14 @@
-1.4.19-mailroom-9.2.2
+1.4.22-mailroom-10.0.0
 ----------
- * update mailroom to 9.2.2 
+* Update rapidpro version to 10.0.0
 
-1.4.19-mailroom-9.0.1
+1.4.21-mailroom-7.4.1
 ----------
- * update mailroom to 9.0.1 
+ * fix merge
 
-1.4.19-mailroom-8.2.0
+1.4.20-mailroom-7.4.1
 ----------
- * update mailroom to 8.2.0 
-
-1.4.19-mailroom-7.5.35
-----------
- * update mailroom to 7.5.35 
+ * remove new expire_ivr_call and recover old expire_calls
 
 1.4.19-mailroom-7.4.1
 ----------

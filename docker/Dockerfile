@@ -1,22 +1,19 @@
-FROM golang:1.23-bookworm AS builder
+FROM golang:1.22-alpine
 
-WORKDIR /src
+WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download -x
+RUN apk add --no-cache build-base git curl tar
 
-COPY . ./
+RUN addgroup -S golang \
+  && adduser -S -G golang golang
+
+COPY . .
 
 RUN curl -L https://github.com/nyaruka/goflow/releases/download/v$(grep goflow go.mod | cut -d" " -f2 | cut -c2-)/docs.tar.gz --output docs.tar.gz && \
     tar -xf docs.tar.gz && rm docs.tar.gz
 
-RUN GOOS=linux GOARCH=amd64 go build -o /bin/mailroom ./cmd/mailroom/*.go
 
-FROM gcr.io/distroless/base-debian12
+RUN go install -v ./cmd/...
 
-WORKDIR /app
-
-COPY --from=builder bin/mailroom ./
-
-EXPOSE 8090
-ENTRYPOINT ["./mailroom"]
+EXPOSE 8000
+ENTRYPOINT ["mailroom"]

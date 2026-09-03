@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
@@ -21,6 +22,45 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFetchAttachment(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	rt.Config.Domain = "courier.test"
+	rt.Config.CourierAuthToken = "sesame"
+
+	defer httpx.SetRequestor(httpx.DefaultRequestor)
+	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+		"https://courier.test/c/_fetch-attachment": {
+			httpx.NewMockResponse(200, map[string]string{"Content-Type": "application/json"}, []byte(`{"attachment": {"content_type": "image/jpeg", "url": "https://backend.com/image.jpg", "size": 123}, "log_uuid": "547deaf7-7620-4434-95b3-58675999c4b7"}`)),
+			httpx.NewMockResponse(404, map[string]string{"Content-Type": "application/json"}, []byte(`{"errors":[{"message":"not found"}]}`)),
+			httpx.NewMockResponse(503, nil, []byte(`Service Unavailable`)),
+		},
+	}))
+
+	oa, err := models.GetOrgAssets(ctx, rt, testdata.Org1.ID)
+	require.NoError(t, err)
+
+	channel := oa.ChannelByUUID(testdata.TwilioChannel.UUID)
+	msgID := models.MsgID(12345)
+	attURL := "https://example.com/media/123"
+
+	att, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
+	require.NoError(t, err)
+	assert.Equal(t, utils.Attachment("image/jpeg:https://backend.com/image.jpg"), att)
+	assert.Equal(t, models.ChannelLogUUID("547deaf7-7620-4434-95b3-58675999c4b7"), logUUID)
+
+	att, logUUID, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
+	require.NoError(t, err)
+	assert.Equal(t, utils.Attachment("unavailable:https://example.com/media/123"), att)
+	assert.Equal(t, models.ChannelLogUUID(""), logUUID)
+
+	_, _, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "server error status")
+}
 
 func TestNewCourierMsg(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
