@@ -18,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/core/msgio"
 	"github.com/nyaruka/mailroom/testsuite"
 	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/utils/clogs"
 	"github.com/nyaruka/null/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,12 +51,12 @@ func TestFetchAttachment(t *testing.T) {
 	att, logUUID, err := msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.NoError(t, err)
 	assert.Equal(t, utils.Attachment("image/jpeg:https://backend.com/image.jpg"), att)
-	assert.Equal(t, models.ChannelLogUUID("547deaf7-7620-4434-95b3-58675999c4b7"), logUUID)
+	assert.Equal(t, clogs.LogUUID("547deaf7-7620-4434-95b3-58675999c4b7"), logUUID)
 
 	att, logUUID, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.NoError(t, err)
 	assert.Equal(t, utils.Attachment("unavailable:https://example.com/media/123"), att)
-	assert.Equal(t, models.ChannelLogUUID(""), logUUID)
+	assert.Equal(t, clogs.LogUUID(""), logUUID)
 
 	_, _, err = msgio.FetchAttachment(ctx, rt, channel, attURL, msgID)
 	require.Error(t, err)
@@ -106,7 +107,7 @@ func TestNewCourierMsg(t *testing.T) {
 
 	// create a non-priority flow message.. i.e. the session isn't responding to an incoming message
 	testdata.InsertWaitingSession(rt, testdata.Org1, testdata.Cathy, models.FlowTypeMessaging, testdata.Favorites, models.NilCallID, time.Now(), time.Now(), false, nil)
-	session, err := models.FindWaitingSessionForContact(ctx, rt.DB, rt.SessionStorage, oa, models.FlowTypeMessaging, cathy)
+	session, err := models.FindWaitingSessionForContact(ctx, rt, oa, models.FlowTypeMessaging, cathy)
 	require.NoError(t, err)
 
 	msg1, err := models.NewOutgoingFlowMsg(rt, oa.Org(), facebook, session, flow, flowMsg1, time.Date(2021, 11, 9, 14, 3, 30, 0, time.UTC))
@@ -193,7 +194,7 @@ func TestNewCourierMsg(t *testing.T) {
 	// try a broadcast message which won't have session and flow fields set and won't be high priority
 	bcastID := testdata.InsertBroadcast(rt, testdata.Org1, `eng`, map[i18n.Language]string{`eng`: "Blast"}, nil, models.NilScheduleID, []*testdata.Contact{testFred}, nil)
 	bcastMsg1 := flows.NewMsgOut(fredURN, assets.NewChannelReference(testdata.TwilioChannel.UUID, "Test Channel"), &flows.MsgContent{Text: "Blast"}, nil, flows.NilMsgTopic, i18n.NilLocale, flows.NilUnsendableReason)
-	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), twilio, fred, bcastMsg1, &models.BroadcastBatch{BroadcastID: bcastID, OptInID: optInID, CreatedByID: testdata.Admin.ID})
+	msg3, err := models.NewOutgoingBroadcastMsg(rt, oa.Org(), twilio, fred, bcastMsg1, &models.Broadcast{ID: bcastID, OptInID: optInID, CreatedByID: testdata.Admin.ID})
 	require.NoError(t, err)
 
 	err = models.InsertMessages(ctx, rt.DB, []*models.Msg{msg3})

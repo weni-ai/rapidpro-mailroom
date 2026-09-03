@@ -1,3 +1,7 @@
+1.4.22-mailroom-10.0.0
+----------
+* Update rapidpro version to 10.0.0
+
 1.4.21-mailroom-7.4.1
 ----------
  * fix merge

@@ -31,10 +31,10 @@ func (c *RetryCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]an
 	log := slog.With("comp", "ivr_cron_retryer")
 
 	// find all calls that need restarting
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*10)
 	defer cancel()
 
-	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 100)
+	calls, err := models.LoadCallsToRetry(ctx, rt.DB, 200)
 	if err != nil {
 		return nil, fmt.Errorf("error loading calls to retry: %w", err)
 	}
@@ -47,11 +47,11 @@ func (c *RetryCron) Run(ctx context.Context, rt *runtime.Runtime) (map[string]an
 		log = log.With("call_id", call.ID())
 
 		// if the channel for this call is throttled, move on
-		if throttledChannels[call.ChannelID()] {
+		/*if throttledChannels[call.ChannelID()] {
 			call.MarkThrottled(ctx, rt.DB, time.Now())
 			log.Info("skipping call, throttled", "channel_id", call.ChannelID())
 			continue
-		}
+		}*/
 
 		// load the org for this call
 		oa, err := models.GetOrgAssets(ctx, rt, call.OrgID())
