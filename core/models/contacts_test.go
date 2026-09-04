@@ -713,3 +713,41 @@ func TestLockContacts(t *testing.T) {
 	// since we errored, any locks we grabbed before the error, should have been released
 	assertredis.NotExists(t, rc, "lock:c:1:101")
 }
+
+func TestReassignShellContactURN(t *testing.T) {
+	ctx, rt := testsuite.Runtime()
+
+	defer testsuite.Reset(testsuite.ResetData)
+
+	oa := testdata.Org1.Load(rt)
+
+	shell := testdata.InsertContact(rt, testdata.Org1, "8b2b8b4c-8e6e-4c96-9e9c-bf6b56a04e37", "Shell", "eng", models.ContactStatusActive)
+	testdata.InsertContactURN(rt, testdata.Org1, shell, "whatsapp:US.A1B2C3", 1000, nil)
+
+	other := testdata.InsertContact(rt, testdata.Org1, "c3e0a2d4-1f5b-4a8c-9d7e-2b6f8a0c1d2e", "Other", "eng", models.ContactStatusActive)
+	testdata.InsertContactURN(rt, testdata.Org1, other, "tel:+16055747777", 1000, nil)
+	testdata.InsertContactURN(rt, testdata.Org1, other, "whatsapp:US.D4E5F6", 999, nil)
+
+	ownerID, reassigned, err := models.ReassignShellContactURN(ctx, rt.DB, oa, testdata.Cathy.ID, "whatsapp:US.XXXXXX")
+	assert.NoError(t, err)
+	assert.Equal(t, models.NilContactID, ownerID)
+	assert.False(t, reassigned)
+
+	ownerID, reassigned, err = models.ReassignShellContactURN(ctx, rt.DB, oa, shell.ID, "whatsapp:US.A1B2C3")
+	assert.NoError(t, err)
+	assert.Equal(t, models.NilContactID, ownerID)
+	assert.False(t, reassigned)
+
+	ownerID, reassigned, err = models.ReassignShellContactURN(ctx, rt.DB, oa, testdata.Cathy.ID, "whatsapp:US.D4E5F6")
+	assert.NoError(t, err)
+	assert.Equal(t, other.ID, ownerID)
+	assert.False(t, reassigned)
+
+	ownerID, reassigned, err = models.ReassignShellContactURN(ctx, rt.DB, oa, testdata.Cathy.ID, "whatsapp:US.A1B2C3")
+	assert.NoError(t, err)
+	assert.Equal(t, shell.ID, ownerID)
+	assert.True(t, reassigned)
+
+	assertdb.Query(t, rt.DB, `SELECT contact_id FROM contacts_contacturn WHERE identity = $1`, "whatsapp:US.A1B2C3").Returns(int64(testdata.Cathy.ID))
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1`, shell.ID).Returns(0)
+}
