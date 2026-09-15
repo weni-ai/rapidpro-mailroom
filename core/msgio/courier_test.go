@@ -93,7 +93,7 @@ func TestNewCourierMsg(t *testing.T) {
 		&flows.MsgContent{
 			Text:         "Hi there",
 			Attachments:  []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
-			QuickReplies: []string{"yes", "no"},
+			QuickReplies: testsuite.QuickReplies("yes", "no"),
 		},
 		flows.NewMsgTemplating(
 			assets.NewTemplateReference(testdata.ReviveTemplate.UUID, "revive_issue"),

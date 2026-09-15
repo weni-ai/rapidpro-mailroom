@@ -210,8 +210,8 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 			contactURN:      "tel:+593979000003",
 			contactLanguage: "fra",
 			translations: flows.BroadcastTranslations{
-				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []string{"yes", "no"}},
-				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []string{"oui", "no"}},
+				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: testsuite.QuickReplies("yes", "no")},
+				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: testsuite.QuickReplies("oui", "no")},
 			},
 			baseLanguage:         "eng",
 			expressions:          true,
