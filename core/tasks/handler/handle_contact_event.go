@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/mailroom/core/models"

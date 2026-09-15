@@ -210,8 +210,8 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 			contactURN:      "tel:+593979000003",
 			contactLanguage: "fra",
 			translations: flows.BroadcastTranslations{
-				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []string{"yes", "no"}},
-				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []string{"oui", "no"}},
+				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: testsuite.QuickReplies("yes", "no")},
+				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: testsuite.QuickReplies("oui", "no")},
 			},
 			baseLanguage:         "eng",
 			expressions:          true,
@@ -278,7 +278,11 @@ func TestBroadcastBatchCreateMessage(t *testing.T) {
 			if assert.Len(t, msgs, 1, "msg count mismatch in test case %d", i) {
 				assert.Equal(t, tc.expectedText, msgs[0].Text(), "%d: msg text mismatch", i)
 				assert.Equal(t, tc.expectedAttachments, msgs[0].Attachments(), "%d: attachments mismatch", i)
-				assert.Equal(t, tc.expectedQuickReplies, msgs[0].QuickReplies(), "%d: quick replies mismatch", i)
+				expectedQR := tc.expectedQuickReplies
+				if expectedQR == nil {
+					expectedQR = []string{}
+				}
+				assert.Equal(t, expectedQR, msgs[0].QuickReplies(), "%d: quick replies mismatch", i)
 				assert.Equal(t, tc.expectedLocale, msgs[0].Locale(), "%d: msg locale mismatch", i)
 				assert.Equal(t, tc.optInID, msgs[0].OptInID(), "%d: optin id mismatch", i)
 			}

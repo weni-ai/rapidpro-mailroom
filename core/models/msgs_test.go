@@ -72,7 +72,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 			Contact: testdata.Cathy,
 			URN:     urns.URN(fmt.Sprintf("tel:+250700000001?id=%d", testdata.Cathy.URNID)),
 			URNID:   testdata.Cathy.URNID,
-			Content: &flows.MsgContent{Text: "test outgoing", QuickReplies: []string{"yes", "no"}},
+			Content: &flows.MsgContent{Text: "test outgoing", QuickReplies: testsuite.QuickReplies("yes", "no")},
 			Templating: flows.NewMsgTemplating(
 				assets.NewTemplateReference("9c22b594-fcab-4b29-9bcb-ce4404894a80", "revive_issue"),
 				[]*flows.TemplatingComponent{{Type: "body", Name: "body", Variables: map[string]int{"1": 0}}},
@@ -184,7 +184,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, tc.Content.Text, msg.Text(), "%d: text mismatch", i)
 		assert.Equal(t, models.MsgTypeText, msg.Type(), "%d: type mismatch", i)
 		assert.Equal(t, expectedAttachments, msg.Attachments(), "%d: attachments mismatch", i)
-		assert.Equal(t, tc.Content.QuickReplies, msg.QuickReplies(), "%d: quick replies mismatch", i)
+		assert.Equal(t, testsuite.QuickReplyStrings(tc.Content.QuickReplies), msg.QuickReplies(), "%d: quick replies mismatch", i)
 		assert.Equal(t, tc.Locale, msg.Locale(), "%d: locale mismatch", i)
 
 		if tc.Templating != nil {

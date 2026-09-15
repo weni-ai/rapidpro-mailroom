@@ -7,7 +7,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 )
 
 // CommitIVRHook is our hook for comitting scene messages / say commands

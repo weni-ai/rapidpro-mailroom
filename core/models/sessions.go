@@ -15,7 +15,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/aws/s3x"
 	"github.com/nyaruka/gocommon/uuids"
@@ -219,7 +219,8 @@ func (s *Session) updateWait(evts []flows.Event) {
 			run, _ := s.findStep(e.StepUUID())
 
 			s.s.WaitStartedOn = &now
-			s.s.WaitExpiresOn = typed.ExpiresOn
+			expiresOn := typed.ExpiresOn
+			s.s.WaitExpiresOn = &expiresOn
 			s.s.WaitResumeOnExpire = canResume(run)
 
 			if typed.TimeoutSeconds != nil {
@@ -233,7 +234,8 @@ func (s *Session) updateWait(evts []flows.Event) {
 			run, _ := s.findStep(e.StepUUID())
 
 			s.s.WaitStartedOn = &now
-			s.s.WaitExpiresOn = typed.ExpiresOn
+			expiresOn := typed.ExpiresOn
+			s.s.WaitExpiresOn = &expiresOn
 			s.s.WaitResumeOnExpire = canResume(run)
 		}
 	}

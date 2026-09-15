@@ -7,7 +7,7 @@ import (
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/runtime"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 )
 
 // InsertWebhookEventHook is our hook for when a resthook needs to be inserted

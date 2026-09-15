@@ -11,12 +11,12 @@ import (
 	"github.com/appleboy/go-fcm"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 	"github.com/nyaruka/gocommon/aws/cwatch"
-	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/gocommon/aws/s3x"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/utils/dynsvc"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/nyaruka/redisx"
 )
@@ -102,7 +102,7 @@ func (mr *Mailroom) Start() error {
 	}
 
 	// setup DynamoDB
-	mr.rt.Dynamo, err = dynamo.NewService(c.AWSAccessKeyID, c.AWSSecretAccessKey, c.AWSRegion, c.DynamoEndpoint, c.DynamoTablePrefix)
+	mr.rt.Dynamo, err = dynsvc.NewService(c.AWSAccessKeyID, c.AWSSecretAccessKey, c.AWSRegion, c.DynamoEndpoint, c.DynamoTablePrefix)
 	if err != nil {
 		return err
 	}
