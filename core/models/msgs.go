@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/gsm7"
@@ -179,6 +179,19 @@ func (m *Msg) CreatedByID() UserID      { return m.m.CreatedByID }
 func (m *Msg) Text() string                  { return m.m.Text }
 func (m *Msg) QuickReplies() []string        { return m.m.QuickReplies }
 func (m *Msg) Locale() i18n.Locale           { return m.m.Locale }
+
+func quickRepliesToDB(qrs []flows.QuickReply) pq.StringArray {
+	out := make(pq.StringArray, len(qrs))
+	for i, qr := range qrs {
+		text, err := qr.MarshalText()
+		if err != nil {
+			out[i] = qr.Text
+			continue
+		}
+		out[i] = string(text)
+	}
+	return out
+}
 func (m *Msg) Templating() *Templating       { return m.m.Templating }
 func (m *Msg) HighPriority() bool            { return m.m.HighPriority }
 func (m *Msg) CreatedOn() time.Time          { return m.m.CreatedOn }
@@ -378,7 +391,7 @@ func newOutgoingTextMsg(rt *runtime.Runtime, org *Org, channel *Channel, contact
 	m.BroadcastID = broadcastID
 	m.TicketID = ticketID
 	m.Text = out.Text()
-	m.QuickReplies = out.QuickReplies()
+	m.QuickReplies = quickRepliesToDB(out.QuickReplies())
 	m.Locale = out.Locale()
 	m.OptInID = optInID
 	m.HighPriority = false
@@ -829,7 +842,8 @@ func CreateMsgOut(rt *runtime.Runtime, oa *OrgAssets, c *flows.Contact, content 
 			content.Attachments[i] = utils.Attachment(evaluated)
 		}
 		for i := range content.QuickReplies {
-			content.QuickReplies[i], _, _ = ev.Template(oa.Env(), expressionsContext, content.QuickReplies[i], nil)
+			evaluated, _, _ := ev.Template(oa.Env(), expressionsContext, content.QuickReplies[i].Text, nil)
+			content.QuickReplies[i].Text = evaluated
 		}
 		for i := range templateVariables {
 			templateVariables[i], _, _ = ev.Template(oa.Env(), expressionsContext, templateVariables[i], nil)

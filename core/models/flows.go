@@ -14,7 +14,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/null/v3"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 )
 
 // FlowID is the type for flow IDs
