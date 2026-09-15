@@ -184,7 +184,7 @@ func TestNewOutgoingFlowMsg(t *testing.T) {
 		assert.Equal(t, tc.Content.Text, msg.Text(), "%d: text mismatch", i)
 		assert.Equal(t, models.MsgTypeText, msg.Type(), "%d: type mismatch", i)
 		assert.Equal(t, expectedAttachments, msg.Attachments(), "%d: attachments mismatch", i)
-		assert.Equal(t, tc.Content.QuickReplies, msg.QuickReplies(), "%d: quick replies mismatch", i)
+		assert.Equal(t, testsuite.QuickReplyStrings(tc.Content.QuickReplies), msg.QuickReplies(), "%d: quick replies mismatch", i)
 		assert.Equal(t, tc.Locale, msg.Locale(), "%d: locale mismatch", i)
 
 		if tc.Templating != nil {

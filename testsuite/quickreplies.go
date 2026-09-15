@@ -10,3 +10,20 @@ func QuickReplies(texts ...string) []flows.QuickReply {
 	}
 	return out
 }
+
+// QuickReplyStrings returns DB/courier string form of quick replies (matches models.quickRepliesToDB).
+func QuickReplyStrings(qrs []flows.QuickReply) []string {
+	if len(qrs) == 0 {
+		return []string{}
+	}
+	out := make([]string, len(qrs))
+	for i, qr := range qrs {
+		text, err := qr.MarshalText()
+		if err != nil {
+			out[i] = qr.Text
+			continue
+		}
+		out[i] = string(text)
+	}
+	return out
+}
