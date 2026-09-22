@@ -46,7 +46,7 @@ func (c *RetryCallsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[stri
 		log = log.With("call_id", call.ID())
 
 		// if the channel for this call is throttled, move on
-		if throttledChannels[call.ChannelID()] {
+		/*if throttledChannels[call.ChannelID()] {
 			call.SetThrottled(ctx, rt.DB)
 			log.Info("skipping call, throttled", "channel_id", call.ChannelID())
 			continue
