@@ -97,7 +97,7 @@ func TestLoadFlows(t *testing.T) {
 		assert.Equal(t, tc.uuid, flow.UUID(), "engine UUID mismatch for %s", desc)
 		assert.Equal(t, tc.name, flow.Name(), "engine name mismatch for %s", desc)
 		assert.Equal(t, tc.expectedEngineType, flow.Type(), "engine type mismatch for %s", desc)
-		assert.Equal(t, tc.expectedExpire, flow.ExpireAfterMinutes(), "engine expire mismatch for %s", desc)
+		assert.Equal(t, tc.expectedExpire, int(flow.ExpireAfter()/time.Minute), "engine expire mismatch for %s", desc)
 
 	}
 

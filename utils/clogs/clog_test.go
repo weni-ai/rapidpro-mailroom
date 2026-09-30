@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/nyaruka/gocommon/aws/dynamo"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/mailroom/utils/clogs"
+	"github.com/nyaruka/mailroom/utils/dynsvc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,14 +26,14 @@ func TestLogs(t *testing.T) {
 	clog1 := clogs.NewLog("type1", nil, []string{"sesame"})
 	clog2 := clogs.NewLog("type1", nil, []string{"sesame"})
 
-	req1, _ := httpx.NewRequest("GET", "http://ivr.com/start", nil, map[string]string{"Authorization": "Token sesame"})
+	req1, _ := httpx.NewRequest(ctx, "GET", "http://ivr.com/start", nil, map[string]string{"Authorization": "Token sesame"})
 	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
 	require.NoError(t, err)
 
 	clog1.HTTP(trace1)
 	clog1.End()
 
-	req2, _ := httpx.NewRequest("GET", "http://ivr.com/hangup", nil, nil)
+	req2, _ := httpx.NewRequest(ctx, "GET", "http://ivr.com/hangup", nil, nil)
 	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
 	require.NoError(t, err)
 
@@ -44,7 +44,7 @@ func TestLogs(t *testing.T) {
 	assert.NotEqual(t, clog1.UUID, clog2.UUID)
 	assert.NotEqual(t, time.Duration(0), clog1.Elapsed)
 
-	ds, err := dynamo.NewService("root", "tembatemba", "us-east-1", "http://localhost:6000", "Test")
+	ds, err := dynsvc.NewService("root", "tembatemba", "us-east-1", "http://localhost:6000", "Test")
 	require.NoError(t, err)
 
 	l1 := clogs.NewLog("test_type1", nil, nil)

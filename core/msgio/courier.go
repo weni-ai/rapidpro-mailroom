@@ -78,6 +78,7 @@ type Msg struct {
 	ContactURNID         models.URNID       `json:"contact_urn_id"`
 	URN                  urns.URN           `json:"urn"`
 	URNAuth              string             `json:"urn_auth,omitempty"`
+	OtherURNs            []urns.URN         `json:"other_urns,omitempty"`
 	Metadata             map[string]any     `json:"metadata,omitempty"`
 	Flow                 *FlowRef           `json:"flow,omitempty"`
 	UserID               models.UserID      `json:"user_id,omitempty"`
@@ -111,6 +112,7 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 		UserID:       m.CreatedByID(),
 		URN:          u.Identity,
 		URNAuth:      string(u.AuthTokens["default"]),
+		OtherURNs:    otherURNs(m, u),
 		Metadata:     m.Metadata(),
 		IsResend:     m.IsResend,
 	}
@@ -174,6 +176,21 @@ func NewCourierMsg(oa *models.OrgAssets, m *models.Msg, u *models.ContactURN, ch
 	}
 
 	return msg, nil
+}
+
+// otherURNs returns the identities of all URNs on the contact except the one being sent to
+func otherURNs(m *models.Msg, sendURN *models.ContactURN) []urns.URN {
+	if m.Contact == nil {
+		return nil
+	}
+	var others []urns.URN
+	for _, u := range m.Contact.URNs() {
+		identity := u.URN().Identity()
+		if sendURN == nil || identity != sendURN.Identity {
+			others = append(others, identity)
+		}
+	}
+	return others
 }
 
 var queuePushScript = redis.NewScript(6, `

@@ -636,6 +636,10 @@ func (a *OrgAssets) Labels() ([]assets.Label, error) {
 	return a.labels, nil
 }
 
+func (a *OrgAssets) LLMs() ([]assets.LLM, error) {
+	return nil, nil
+}
+
 func (a *OrgAssets) LabelByUUID(uuid assets.LabelUUID) *Label {
 	return a.labelsByUUID[uuid]
 }

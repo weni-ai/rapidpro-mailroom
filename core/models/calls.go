@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/vinovest/sqlx"
 	"github.com/lib/pq"
 	"github.com/nyaruka/null/v3"
 )

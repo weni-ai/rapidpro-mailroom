@@ -151,7 +151,7 @@ func handleTestErrors(ctx context.Context, rt *runtime.Runtime, r *testErrorsReq
 		slog.Error(r.Log)
 	}
 	if r.Return != "" {
-		return nil, http.StatusInternalServerError, fmt.Errorf(r.Return)
+		return nil, http.StatusInternalServerError, fmt.Errorf("%s", r.Return)
 	}
 	if r.Panic != "" {
 		panic(r.Panic)
