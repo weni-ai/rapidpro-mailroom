@@ -12,9 +12,9 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,8 +229,8 @@ func TestBroadcastSend(t *testing.T) {
 			contactURN:      "tel:+593979000003",
 			contactLanguage: "fra",
 			translations: flows.BroadcastTranslations{
-				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []flows.QuickReply{{Text: "yes"}, {Text: "no"}}},
-				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []flows.QuickReply{{Text: "oui"}, {Text: "no"}}},
+				"eng": {Text: "Hello @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.en.mp3"}, QuickReplies: []flows.QuickReply{{Type: "text", Text: "yes"}, {Type: "text", Text: "no"}}},
+				"fra": {Text: "Bonjour @contact.name", Attachments: []utils.Attachment{"audio/mp3:http://test.fr.mp3"}, QuickReplies: []flows.QuickReply{{Type: "text", Text: "oui"}, {Type: "text", Text: "no"}}},
 			},
 			baseLanguage: "eng",
 			expressions:  true,
@@ -250,9 +250,11 @@ func TestBroadcastSend(t *testing.T) {
 					],
 					"quick_replies": [
 						{
+							"type": "text",
 							"text": "oui"
 						},
 						{
+							"type": "text",
 							"text": "no"
 						}
 					],
@@ -332,7 +334,7 @@ func TestBroadcastSend(t *testing.T) {
 
 		_, ec, _ := contact.Load(t, rt, oa)
 
-		evt, err := bcast.Send(rt, oa, ec)
+		evt, err := bcast.Send(ctx, rt, oa, ec)
 		require.NoError(t, err)
 
 		assert.JSONEq(t, string(tc.expected), string(jsonx.MustMarshal(evt)), "%d: msg json mismatch", i)

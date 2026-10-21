@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
@@ -48,7 +48,7 @@ func (h *deleteMessages) Execute(ctx context.Context, rt *runtime.Runtime, tx *s
 	}
 
 	for _, tag := range tags {
-		if _, err := rt.Writers.History.Queue(tag); err != nil {
+		if _, err := rt.Dynamo.History.Queue(tag); err != nil {
 			return fmt.Errorf("error queuing deletion tag to writer: %w", err)
 		}
 	}

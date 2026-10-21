@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/campaigns"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -34,7 +33,7 @@ func handleSchedule(ctx context.Context, rt *runtime.Runtime, r *scheduleRequest
 		return nil, 0, fmt.Errorf("error loading org assets: %w", err)
 	}
 
-	task := &campaigns.ScheduleCampaignPointTask{PointID: r.PointID}
+	task := &tasks.ScheduleCampaignPoint{PointID: r.PointID}
 
 	if err := tasks.Queue(ctx, rt, rt.Queues.Batch, r.OrgID, task, true); err != nil {
 		return nil, 0, fmt.Errorf("error queuing schedule campaign point task: %w", err)

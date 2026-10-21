@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/msgs"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 // CreateBroadcasts is our hook for creating broadcasts
@@ -31,7 +30,7 @@ func (h *createBroadcasts) Execute(ctx context.Context, rt *runtime.Runtime, oa 
 				return fmt.Errorf("error creating broadcast: %w", err)
 			}
 
-			err = tasks.Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), &msgs.SendBroadcastTask{Broadcast: bcast}, false)
+			err = tasks.Queue(ctx, rt, rt.Queues.Batch, oa.OrgID(), &tasks.SendBroadcast{Broadcast: bcast}, false)
 			if err != nil {
 				return fmt.Errorf("error queuing broadcast task: %w", err)
 			}

@@ -10,11 +10,10 @@ import (
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/msgs"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -117,7 +116,7 @@ func handleBroadcast(ctx context.Context, rt *runtime.Runtime, r *broadcastReque
 
 	// if broadcast doesn't have a schedule, queue it up for immediate sending
 	if r.Schedule == nil {
-		task := &msgs.SendBroadcastTask{Broadcast: bcast}
+		task := &tasks.SendBroadcast{Broadcast: bcast}
 
 		if err := tasks.Queue(ctx, rt, rt.Queues.Batch, bcast.OrgID, task, true); err != nil {
 			return nil, 0, fmt.Errorf("error queuing send broadcast task: %w", err)

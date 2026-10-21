@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
@@ -26,7 +26,7 @@ func (h *insertMessages) Execute(ctx context.Context, rt *runtime.Runtime, tx *s
 
 			// if a URN was added during the flow sprint, message won't have an URN ID which we need to insert it
 			if msg.ContactURNID() == models.NilURNID && urn != urns.NilURN {
-				cu, err := models.CreateOrStealURN(ctx, tx, oa, scene.ContactID(), urn)
+				cu, err := models.CreateOrClaimURN(ctx, tx, oa, scene.ContactID(), urn)
 				if err != nil {
 					return fmt.Errorf("error creating new URN %s for message: %w", urn, err)
 				}

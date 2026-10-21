@@ -6,9 +6,9 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 func init() {
@@ -25,7 +25,6 @@ func init() {
 	runner.RegisterEventHandler(events.TypeOptInStopped, noopHandler)
 	runner.RegisterEventHandler(events.TypeRunEnded, noopHandler)
 	runner.RegisterEventHandler(events.TypeRunResultChanged, noopHandler)
-	runner.RegisterEventHandler(events.TypeServiceCalled, noopHandler)
 	runner.RegisterEventHandler(events.TypeWaitExpired, noopHandler)
 	runner.RegisterEventHandler(events.TypeWaitTimedOut, noopHandler)
 }

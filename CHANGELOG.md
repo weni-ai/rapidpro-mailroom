@@ -1,3 +1,628 @@
+v26.2.0 (2026-06-15)
+-------------------------
+ * Update dependencies including phonenumbers to v2.0.1
+
+v26.1.132 (2026-06-04)
+-------------------------
+ * Update to goflow v0.277.3 and gocommon v1.83.0 and rework HTTP clients
+
+v26.1.131 (2026-06-03)
+-------------------------
+ * Update goflow to v0.277.1
+
+v26.1.130 (2026-06-02)
+-------------------------
+ * Update phonenumbers to v1.8.0
+
+v26.1.129 (2026-06-01)
+-------------------------
+ * Add OrgID to LLM model
+
+v26.1.128 (2026-06-01)
+-------------------------
+ * Rename clogs package to svclogs
+
+v26.1.127 (2026-05-28)
+-------------------------
+ * Move airtime transfers to an async lifecycle driven by provider status callbacks
+ * Record airtime status changes as event tags in contact history
+
+v26.1.126 (2026-05-27)
+-------------------------
+ * Set ExternalID on simulator airtime transfers
+ * Update to goflow v0.276.1 which adds flow spec 14.4.1 to fix broken resthook actions
+
+v26.1.125 (2026-05-26)
+-------------------------
+ * Change default cloudwatch namespace to Mailroom
+ * Update to goflow v0.275.0 and remove classifier support
+
+v26.1.124 (2026-05-25)
+-------------------------
+ * Update deps and fix disallowed network list
+
+v26.1.123 (2026-05-25)
+-------------------------
+ * Expand default DisallowedNetworks (full loopback, IPv4-mapped IPv6, ULA, CGNAT, and more)
+
+v26.1.122 (2026-05-20)
+-------------------------
+ * Trim webhook User-Agent to avoid leaking build details
+
+v26.1.121 (2026-05-20)
+-------------------------
+ * Route user-controlled webhook calls through optional outbound HTTP proxy
+ * Drop /ping back-compat alias
+
+v26.1.120 (2026-05-19)
+-------------------------
+ * Serve health response at /, alias /ping for back-compat
+
+v26.1.119 (2026-05-19)
+-------------------------
+ * Drop deprecated temperature param from Anthropic LLM calls
+
+v26.1.118 (2026-05-18)
+-------------------------
+ * Expose internal /mi/* routes only on the internal listener
+
+v26.1.117 (2026-05-18)
+-------------------------
+ * Add /ping liveness endpoint on both listeners
+
+v26.1.116 (2026-05-18)
+-------------------------
+ * Rename Config.Address/Port to PublicAddress/PublicPort
+ * Renumber listener ports: 80xx prod, 81xx tests
+ * Expose internal endpoints on separate listener port
+
+v26.1.115 (2026-05-14)
+-------------------------
+ * Remove plaintext webhook logging
+
+v26.1.114 (2026-05-13)
+-------------------------
+ * Detach context when recording LLM call counts
+ * Log warning when /mr/* request arrives over plaintext HTTP
+
+v26.1.113 (2026-05-13)
+-------------------------
+ * Rename Elastic config field to ElasticEndpoint
+
+v26.1.112 (2026-05-13)
+-------------------------
+ * Add MAILROOM_COURIER_ENDPOINT config for calls to courier
+
+v26.1.111 (2026-05-12)
+-------------------------
+ * Drop /mr/ backwards-compat mounts for internal endpoints
+
+v26.1.110 (2026-05-12)
+-------------------------
+ * Use new /ci/attachment/fetch courier endpoint instead of deprecated /c/_fetch-attachment
+ * Use separate valkey DB for tests to avoid interference from local courier
+
+v26.1.109 (2026-05-04)
+-------------------------
+ * Allow disabling task processing per queue by setting workers to zero
+
+v26.1.108 (2026-05-04)
+-------------------------
+ * Record daily LLM call and token counts
+
+v26.1.107 (2026-04-30)
+-------------------------
+ * Record LLM input and output tokens separately
+
+v26.1.106 (2026-04-29)
+-------------------------
+ * Index urn_path on message documents
+
+v26.1.105 (2026-04-28)
+-------------------------
+ * Log raw LLM output when /llm/translate fails to parse it
+
+v26.1.104 (2026-04-28)
+-------------------------
+ * Reduce LLM max_output_tokens cap to 16000
+ * Update go-elasticsearch to v9 and gocommon to v1.80.0
+
+v26.1.103 (2026-04-28)
+-------------------------
+ * Update goflow to v0.274.0 and rename LLM roles translation/flows to editing/engine
+
+v26.1.102 (2026-04-28)
+-------------------------
+ * Update dependencies
+
+v26.1.101 (2026-04-28)
+-------------------------
+ * Cap LLM max_output_tokens at 32000
+
+v26.1.100 (2026-04-27)
+-------------------------
+ * Use System field for Anthropic instructions, clean output once
+
+v26.1.99 (2026-04-27)
+-------------------------
+ * Reject /llm/translate requests with LLMs lacking the translation role
+ * Update to goflow v0.273.10 and load LLM roles from database
+
+v26.1.98 (2026-04-24)
+-------------------------
+ * Load LLM max_output_tokens from db and use it for translate calls
+ * Translate all items in a single LLM call
+
+v26.1.97 (2026-04-23)
+-------------------------
+ * Return 422 when LLM service call fails in translate endpoint
+
+v26.1.96 (2026-04-23)
+-------------------------
+ * Add case preservation and length limits to translate prompts
+ * Bump gocommon to v1.79.0 and use writer for message deindexing
+ * Batch translation in /llm/translate endpoint
+
+v26.1.95 (2026-04-22)
+-------------------------
+ * Remove pauses in Twilio IVR
+ * Support templates on message-type campaign events
+
+v26.1.94 (2026-04-22)
+-------------------------
+ * Add short pause to initial inbound IVR TwiML response
+ * Update test database
+
+v26.1.93 (2026-04-15)
+-------------------------
+ * Do no wait for messages ES deletion by contact synchronously
+
+v26.1.92 (2026-04-13)
+-------------------------
+ * Index newly created contacts in Elasticsearch (#1042)
+
+v26.1.91 (2026-04-08)
+-------------------------
+ * Update to latest goflow
+
+v26.1.90 (2026-04-08)
+-------------------------
+ * Fix TestEventReceived and TestMsgReceivedTask after goflow scheme check
+
+v26.1.89 (2026-04-08)
+-------------------------
+ * Update to latest goflow
+
+v26.1.88 (2026-04-07)
+-------------------------
+ * Update to latest goflow that fixes routes modifier in set mode
+
+v26.1.87 (2026-04-07)
+-------------------------
+ * Update dependencies
+
+v26.1.86 (2026-04-07)
+-------------------------
+ * Use goflow routes modifier to save channel affinity for new URNs on msg_received
+
+v26.1.85 (2026-04-06)
+-------------------------
+ * Add /v26 major version suffix to module path
+
+v26.1.84 (2026-04-06)
+-------------------------
+ * Add config to exclude specific orgs from latency metrics
+
+v26.1.83 (2026-04-02)
+-------------------------
+ * Update export test snapshots for changed contact UUIDs
+
+v26.1.82 (2026-04-02)
+-------------------------
+ * Add other_urns to courier send message payload
+
+v26.1.81 (2026-04-02)
+-------------------------
+ * Validate contact tasks after deserializing from Valkey
+ * Add contact_changed task type for handling contact modifications from courier
+ * Update to latest phonenumbers
+
+v26.1.80 (2026-04-01)
+-------------------------
+ * Read from Org.root_location instead of Org.country
+ * De-index deleted messages from Elasticsearch
+ * Use contact UUIDs instead of IDs in contact/export endpoint
+
+v26.1.79 (2026-03-31)
+-------------------------
+ * Use contact UUIDs instead of IDs in contact/reindex endpoint
+ * Update gocommon and phonenumbers
+ * Use UUID-based ES search for recipient resolution
+
+v26.1.78 (2026-03-31)
+-------------------------
+ * Change /contact/search to return contact_uuids instead of contact_ids
+ * Simplify message indexing criteria to contact last_seen_on + text length
+
+v26.1.77 (2026-03-31)
+-------------------------
+ * Change /contact/search to use exclude_uuids instead of exclude_ids
+ * Add new_urn append support to msg_received task
+ * Bump valkey from 8.0 to 8.1 in CI
+
+v26.1.76 (2026-03-27)
+-------------------------
+ * Update to latest gocommon which adds bsuid URNs
+ * Update deps including goflow that relaxes restrictions on flow types on enter flow actions
+ * Add optional centrifugo support
+ * Remove support for legacy rp-indexer contacts index
+
+v26.1.75 (2026-03-25)
+-------------------------
+ * Remove fuzziness on message searches
+ * Update ordering for message search for contact-specific queries
+
+v26.1.74 (2026-03-24)
+-------------------------
+ * Use contact UUID as _id in new contacts ES index
+
+v26.1.73 (2026-03-24)
+-------------------------
+ * CI releasing tweaks
+
+v26.1.72 (2026-03-24)
+-------------------------
+ * Update goflow to v0.272.0 and use new es.Converter API
+ * Update to go 1.26
+ * Even more test cleanup
+
+v26.1.71 (2026-03-23)
+-------------------------
+ * Make tests always use v2 contacts index and remove rp-indexer dependency
+ * Use config toggle to switch contact search between v1 and v2 index
+
+v26.1.70 (2026-03-19)
+-------------------------
+ * Move message indexing from OpenSearch to Elasticsearch
+
+v26.1.69 (2026-03-19)
+-------------------------
+ * Update goflow to v0.271.0 which adds flow spec 14.4.0
+ * Internalize v1/v2 ES index comparison into search functions
+
+v26.1.68 (2026-03-18)
+-------------------------
+ * Add messages mode to mrindex command
+
+v26.1.67 (2026-03-18)
+-------------------------
+ * Reduce elastic writer batch size to 250
+ * Tweak OS message index
+
+v26.1.66 (2026-03-18)
+-------------------------
+ * Switch contact indexing from OpenSearch to Elastic v2 index
+
+v26.1.65 (2026-03-12)
+-------------------------
+ * Change some contact index fields to be keyword
+ * Deindex contacts from OpenSearch as well as Elastic
+
+v26.1.64 (2026-03-12)
+-------------------------
+ * Rename db_id to id to match ES index
+ * Use database ID as _id in OpenSearch contacts index
+
+v26.1.63 (2026-03-12)
+-------------------------
+ * Use docvalue_fields instead of _source for OS contact search
+
+v26.1.62 (2026-03-12)
+-------------------------
+ * Use filter context instead of must in contact search queries
+
+v26.1.61 (2026-03-11)
+-------------------------
+ * Use background context for deferred PIT cleanup
+ * Fix requeuing of failed contact tasks
+ * Fix PIT leak on error and enforce limit in paginated contact search
+
+v26.1.60 (2026-03-11)
+-------------------------
+ * Add metrics reporting for contact search duration by backend (ES/OS)
+ * Add config to control proportion of searches verified against OpenSearch
+ * Run contact search against both ES and OpenSearch, log mismatches
+
+v26.1.59 (2026-03-10)
+-------------------------
+ * Update to latest goflow and gocommon
+
+v26.1.58 (2026-03-10)
+-------------------------
+ * Fix GetContactIDsPage passing NilContactID as NULL to SQL
+
+v26.1.57 (2026-03-10)
+-------------------------
+ * Fix goreleaser config
+
+v26.1.56 (2026-03-09)
+-------------------------
+ * Use contacts as name of index (can be alias for contacts-v1 in prod)
+ * Add mrindex command to re-index all contacts
+ * Rename legacy_id to db_id in OpenSearch contacts index
+ * Add OpenSearch backend support for contact search queries
+
+v26.1.55 (2026-03-09)
+-------------------------
+ * Rename legacy_id in context index since it will always be needed for ref in queries
+
+v26.1.54 (2026-03-05)
+-------------------------
+ * Enable contact indexing to OpenSearch generally
+ * Add contact reindex endpoint
+
+v26.1.53 (2026-03-04)
+-------------------------
+ * Add new Counter util for tracking progress of batch tasks
+ * Rework populate_group task to use batch sub-tasks
+
+v26.1.52 (2026-03-03)
+-------------------------
+ * Flow spec v14.3.1
+
+v26.1.51 (2026-03-03)
+-------------------------
+ * Update to latest goflow
+
+v26.1.50 (2026-03-03)
+-------------------------
+ * Update to latest goflow
+ * Convert query group population to use event pipeline
+ * Start indexing contacts - skipping flow_history_ids for now
+ * Make OpenSearch required in config
+
+v26.1.49 (2026-03-02)
+-------------------------
+ * Tweak format of response from system/latency
+
+v26.1.48 (2026-03-02)
+-------------------------
+ * Add system/latencies endpoint to expose this info to RapidPro
+ * Start recording org specific ctask latencies to Valkey
+
+v26.1.47 (2026-02-27)
+-------------------------
+ * Improve experimental message search
+
+v26.1.46 (2026-02-26)
+-------------------------
+ * Add doc_values=false to messages index template
+ * Add in_ticket boolean field to message docs
+
+v26.1.45 (2026-02-26)
+-------------------------
+ * Remove total from message search results
+
+v26.1.44 (2026-02-26)
+-------------------------
+ * Exclude IVR messages from OpenSearch indexing
+ * Add optional contact_uuid filter to /msg/search endpoint
+ * Index all messages that are not from flows or broadcasts
+ * Deindex contact messages when deindexing a contact
+
+v26.1.43 (2026-02-25)
+-------------------------
+ * Rework OpenSearch experiment to work against a regular cluster
+
+v26.1.42 (2026-02-24)
+-------------------------
+ * Revert change to make OpenSearch required
+
+v26.1.41 (2026-02-24)
+-------------------------
+ * Make OpenSearch config required and report spool size to Cloudwatch
+
+v26.1.40 (2026-02-24)
+-------------------------
+ * Tweak OpenSearch env names and runtime struct
+
+v26.1.39 (2026-02-23)
+-------------------------
+ * Add messages search endpoint
+
+v26.1.38 (2026-02-23)
+-------------------------
+ * Make messages index name configurable
+ * Update to latest gocommon
+
+v26.1.37 (2026-02-22)
+-------------------------
+ * Update to latest goflow
+
+v26.1.36 (2026-02-19)
+-------------------------
+ * Fix startup check for opensearch
+
+v26.1.35 (2026-02-19)
+-------------------------
+ * Create regular index for messages instead of template
+
+v26.1.34 (2026-02-18)
+-------------------------
+ * Start indexing messages associated with tickets to opensearch
+ * Update dependencies
+
+v26.1.33 (2026-02-18)
+-------------------------
+ * Update to latest goflow that adds ticket_uuid to msg_received events
+ * Add OpenSearch writer and spool to runtime
+
+v26.1.32 (2026-02-16)
+-------------------------
+ * OpenSearch config needs to be collection specific
+
+v26.1.31 (2026-02-16)
+-------------------------
+ * When campaign points are flow events, use smaller batches
+ * Add optional OpenSearch client (not yet used)
+
+v26.1.30 (2026-02-16)
+-------------------------
+ * Don't create wait timeout fires if they'd occur after the wait expiration
+ * Ensure that contacts are properly locked when for campaign events that use skip mode
+
+v26.1.29 (2026-02-12)
+-------------------------
+ * Tweaks to GetContactWaitingSession.. should log error if contact's current session no longer exists or is not waiting
+
+v26.1.28 (2026-02-11)
+-------------------------
+ * Get rid of ever using the read replica to load contacts for realtime tasks.
+ * Simplify insertDatabaseSessions
+
+v26.1.27 (2026-02-11)
+-------------------------
+ * Simplify GetWaitingSessionForContact
+ * Wait expiration and timeout events should noop if the contact's current session has already changed
+
+v26.1.26 (2026-02-10)
+-------------------------
+ * Completely remove old Msg.quick_replies field
+
+v26.1.25 (2026-02-10)
+-------------------------
+ * Fix handling of lock grabs that timeout
+ * Set a redis key to track progress of flow interruption
+
+v26.1.24 (2026-02-09)
+-------------------------
+ * Update phonenumbers
+ * Stop writing Msg.quick_replies to the DB
+
+v26.1.23 (2026-02-05)
+-------------------------
+ * Start reading from Msg.quickreplies when set
+
+v26.1.22 (2026-02-05)
+-------------------------
+ * Start writing Msg.quickreplies
+ * Update URN affinity via scene and modifier
+ * Update test database
+ * Update goflow which tweaks truncation of quick replies
+
+v26.1.21 (2026-02-04)
+-------------------------
+ * Tweak updating of last seen to use value from event
+
+v26.1.20 (2026-02-03)
+-------------------------
+ * Update goflow which adds type field to QuickReply
+ * Do last_seen_on update within the scene
+
+v26.1.19 (2026-02-03)
+-------------------------
+ * Do initialization of new contacts and unstopping of stopped contacts within the scene
+ * Rely on UpdateContactModifiedOn hook to update modified_on instead of updating directly
+
+v26.1.18 (2026-01-29)
+-------------------------
+ * Replace final usage of ExitSessions
+
+v26.1.17 (2026-01-28)
+-------------------------
+ * interrupt_channel task should defer to interrupt_session_batch task for session interruption
+ * Remove no longer used bulk_session_expire task
+
+v26.1.16 (2026-01-27)
+-------------------------
+ * Fix using InterruptSessionBatch to expire sessions
+
+v26.1.15 (2026-01-27)
+-------------------------
+ * Use interrupt session batch task for session expiration fires
+
+v26.1.14 (2026-01-27)
+-------------------------
+ * Use new interrupt_contacts task type for contact/interrupt endpoint
+ * Make status required on InterruptSessionBatch task
+
+v26.1.13 (2026-01-27)
+-------------------------
+ * Add status to interrupt_session_batch tasks
+ * Add new interrupt_contacts task to replace interrupt_sessions
+
+v26.1.12 (2026-01-27)
+-------------------------
+ * Use new interrupt_flow task for flow/interrupt endpoint
+
+v26.1.11 (2026-01-26)
+-------------------------
+ * Update deps including goflow
+ * Rework session interruption
+ * Remove deprecated fields from modify endpoint responses
+ * Use panic instead of error for missing event handler
+ * Return even non-persisted events from endpoints
+ * Use runner.LockAndLoad for flow starts as well
+
+v26.1.10 (2026-01-22)
+-------------------------
+ * Contact modify endpoint should only return contacts in testing mode
+
+v26.1.9 (2026-01-22)
+-------------------------
+ * Add events to modify responses to match other endpoints
+ * Interrupt endpoint should return history events
+ * Rework locking for contact modification and interruption
+
+v26.1.8 (2026-01-19)
+-------------------------
+ * Rework interrput_channel task so interrupted contacts go thru proper event pipelines
+ * Remove no longer used code for overriding flow definitions in simulations
+ * Remove use of Msg.external_id
+
+v26.1.7 (2026-01-19)
+-------------------------
+ * Add via on ticket endpoints as well
+ * Add via field to contact create and modify endpoints
+
+v26.1.6 (2026-01-15)
+-------------------------
+ * Never credit error events to users
+ * Don't persist URN-taken error events that occur via imports
+ * Record on events if they happened via import
+
+v26.1.5 (2026-01-15)
+-------------------------
+ * Persist URN taken error events
+ * Update to latest goflow which improves more error events
+
+v26.1.4 (2026-01-14)
+-------------------------
+ * Update to latest goflow which improves failure events
+ * Increase max steps per sprint to 250
+ * Persist failure events from failed sessions
+
+v26.1.3 (2026-01-13)
+-------------------------
+ * Ignore created_on on event_received tasks and just use now
+
+v26.1.2 (2026-01-13)
+-------------------------
+ * Prevent URN stealing
+ * Update to latest goflow
+ * Revert to testing on PG15
+
+v26.1.1 (2026-01-08)
+-------------------------
+ * Add Msg.external_identifier field
+
+v26.1.0 (2026-01-06)
+-------------------------
+ * Add ordering by id to LoadContacts
+ * Update test database
+ * Remove support for sessions with output in S3
+ * Test against Postgresql 17
+
 v26.0.0 (2026-01-05)
 -------------------------
  * Update README

@@ -2,14 +2,13 @@ package dtone_test
 
 import (
 	"context"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/nyaruka/gocommon/dates"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/services/airtime/dtone"
+	"github.com/nyaruka/mailroom/v26/services/airtime/dtone"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -193,6 +192,20 @@ var productsResponse = `[
 	}
 ]`
 
+// transactionCreatedResponse is what the provider returns from TransactionAsync when auto_confirm:false —
+// the transaction exists but is held pending the host's Confirm call.
+var transactionCreatedResponse = `{
+	"creation_date": "2021-03-24T20:05:05.883561000Z",
+	"credit_party_identifier": {"mobile_number": "+593979123456"},
+	"external_id": "EX12345",
+	"id": 2237512891,
+	"status": {
+		"class": {"id": 1, "message": "CREATED"},
+		"id": 10000,
+		"message": "CREATED"
+	}
+}`
+
 var transactionConfirmedResponse = `{
 	"benefits": [
 		{
@@ -342,10 +355,9 @@ var transactionRejectedResponse = `{
 func TestClient(t *testing.T) {
 	ctx := context.Background()
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
 	defer dates.SetNowFunc(time.Now)
 
-	mocks := httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+	client, _ := test.MockedHTTP(map[string][]*httpx.MockResponse{
 		"https://dvs-api.dtone.com/v1/lookup/mobile-number": {
 			httpx.NewMockResponse(200, nil, []byte(lookupNumberResponse)), // successful mobile number lookup
 			httpx.MockConnectionError,                                     // timeout
@@ -358,10 +370,9 @@ func TestClient(t *testing.T) {
 		},
 	})
 
-	httpx.SetRequestor(mocks)
 	dates.SetNowFunc(dates.NewSequentialNow(time.Date(2019, 10, 9, 15, 25, 30, 123456789, time.UTC), time.Second))
 
-	cl := dtone.NewClient(http.DefaultClient, nil, "key123", "sesame")
+	cl := dtone.NewClient(client, nil, "key123", "sesame")
 
 	// test lookup mobile number
 	operators, trace, err := cl.LookupMobileNumber(ctx, "+593979123456")
@@ -387,10 +398,33 @@ func TestClient(t *testing.T) {
 	test.AssertSnapshot(t, "products", string(trace.RequestTrace))
 
 	// create a synchronous transaction
-	tx, trace, err := cl.TransactionAsync(ctx, "EX12345", 6035, "+593979123456")
+	tx, trace, err := cl.TransactionAsync(ctx, "EX12345", 6035, "+593979123456", "https://mailroom.example.com/mr/airtime/dtone/status")
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2237512891), tx.ID)
 	assert.Equal(t, "EX12345", tx.ExternalID)
 	assert.Equal(t, "REJECTED-OPERATOR-CURRENTLY-UNAVAILABLE", tx.Status.Message)
 	test.AssertSnapshot(t, "transaction_async", string(trace.RequestTrace))
+}
+
+// TestClientRetries verifies that when the retry config retries an (idempotent) request, the retry count
+// survives the WithTraces(WithRetries(...)) composition and surfaces on the returned trace — that count is
+// what gets persisted as request_logs_httplog.num_retries.
+func TestClientRetries(t *testing.T) {
+	ctx := context.Background()
+
+	// products is a GET, so a 503 is retried; the second attempt succeeds
+	client, mocks := test.MockedHTTP(map[string][]*httpx.MockResponse{
+		"https://dvs-api.dtone.com/v1/products?type=FIXED_VALUE_RECHARGE&operator_id=1596&per_page=100": {
+			httpx.NewMockResponse(503, nil, []byte(`{}`)),
+			httpx.NewMockResponse(200, nil, []byte(productsResponse)),
+		},
+	})
+
+	cl := dtone.NewClient(client, httpx.NewFixedRetries(time.Millisecond), "key123", "sesame")
+
+	products, trace, err := cl.Products(ctx, "FIXED_VALUE_RECHARGE", 1596)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(products))
+	assert.Equal(t, 1, trace.Retries)
+	assert.False(t, mocks.HasUnused())
 }

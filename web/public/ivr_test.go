@@ -14,16 +14,15 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/core/models"
-	_ "github.com/nyaruka/mailroom/core/runner/handlers"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/starts"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/services/ivr/twiml"
-	"github.com/nyaruka/mailroom/services/ivr/vonage"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
-	"github.com/nyaruka/mailroom/utils/clogs"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	_ "github.com/nyaruka/mailroom/v26/core/runner/handlers"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/services/ivr/twiml"
+	"github.com/nyaruka/mailroom/v26/services/ivr/vonage"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,7 +67,7 @@ func TestTwilioIVR(t *testing.T) {
 	testdb.InsertIncomingCallTrigger(t, rt, testdb.Org1, testdb.IVRFlow, []*testdb.Group{testdb.DoctorsGroup}, nil, nil)
 
 	// set callback domain and enable machine detection
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8091", "machine_detection": true}'::jsonb WHERE id = $1`, testdb.TwilioChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8190", "machine_detection": true}'::jsonb WHERE id = $1`, testdb.TwilioChannel.ID)
 
 	// create a flow start for Ann, Bob, and Cat
 	parentSummary := []byte(`{
@@ -92,7 +91,7 @@ func TestTwilioIVR(t *testing.T) {
 		WithContactIDs([]models.ContactID{testdb.Ann.ID, testdb.Bob.ID, testdb.Cat.ID}).
 		WithParentSummary(parentSummary)
 
-	err := tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
+	err := tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &tasks.StartFlow{FlowStart: start}, false)
 	require.NoError(t, err)
 
 	testsuite.FlushTasks(t, rt)
@@ -175,7 +174,7 @@ func TestVonageIVR(t *testing.T) {
 	rt.DB.MustExec(`UPDATE channels_channel SET is_active = FALSE WHERE id = $1`, testdb.TwilioChannel.ID)
 
 	// update callback domain and role
-	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8091"}'::jsonb, role='SRCA' WHERE id = $1`, testdb.VonageChannel.ID)
+	rt.DB.MustExec(`UPDATE channels_channel SET config = config || '{"callback_domain": "localhost:8190"}'::jsonb, role='SRCA' WHERE id = $1`, testdb.VonageChannel.ID)
 
 	// start mocked API server
 	mockVonage := test.NewHTTPServer(50002, http.HandlerFunc(mockVonageHandler))
@@ -195,7 +194,7 @@ func TestVonageIVR(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowstart`).Returns(1)
 	assertdb.Query(t, rt.DB, `SELECT COUNT(*) FROM flows_flowstart WHERE params ->> 'ref_id' = '123'`).Returns(1)
 
-	err = tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &starts.StartFlowTask{FlowStart: start}, false)
+	err = tasks.Queue(ctx, rt, rt.Queues.Batch, testdb.Org1.ID, &tasks.StartFlow{FlowStart: start}, false)
 	require.NoError(t, err)
 
 	testsuite.FlushTasks(t, rt)
@@ -233,22 +232,22 @@ func TestVonageIVR(t *testing.T) {
 }
 
 func getCallLogs(t *testing.T, rt *runtime.Runtime, ch *testdb.Channel) []*httpx.Log {
-	rt.Writers.Main.Flush()
+	rt.Dynamo.Main.Flush()
 
-	var logUUIDs []clogs.UUID
+	var logUUIDs []svclogs.UUID
 	err := rt.DB.Select(&logUUIDs, `SELECT unnest(log_uuids) FROM ivr_call ORDER BY id`)
 	require.NoError(t, err)
 
 	logs := make([]*httpx.Log, 0, len(logUUIDs))
 
 	type DataGZ struct {
-		HttpLogs []*httpx.Log   `json:"http_logs"`
-		Errors   []*clogs.Error `json:"errors"`
+		HttpLogs []*httpx.Log     `json:"http_logs"`
+		Errors   []*svclogs.Error `json:"errors"`
 	}
 
 	for _, logUUID := range logUUIDs {
 		key := dynamo.Key{PK: fmt.Sprintf("cha#%s#%s", ch.UUID, logUUID[35:36]), SK: fmt.Sprintf("log#%s", logUUID)}
-		item, err := dynamo.GetItem(t.Context(), rt.Dynamo, "TestMain", key)
+		item, err := dynamo.GetItem(t.Context(), rt.Dynamo.Main.Client(), "TestMain", key)
 		require.NoError(t, err)
 		require.NotNil(t, item, "log item not found for key %s", key)
 

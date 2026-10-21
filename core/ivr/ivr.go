@@ -15,11 +15,12 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/clogs"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 	"github.com/vinovest/sqlx"
 )
 
@@ -65,7 +66,7 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, call *models.Call) (*m
 	}
 
 	// create the right service
-	svc, err := GetService(channel)
+	svc, err := GetService(rt.HTTP.Services, channel)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create IVR service: %w", err)
 	}
@@ -79,7 +80,7 @@ func HangupCall(ctx context.Context, rt *runtime.Runtime, call *models.Call) (*m
 		clog.HTTP(trace)
 	}
 	if err != nil {
-		clog.Error(&clogs.Error{Message: err.Error()})
+		clog.Error(&svclogs.Error{Message: err.Error()})
 	}
 
 	if err := call.AttachLog(ctx, rt.DB, clog); err != nil {
@@ -142,7 +143,7 @@ func RequestCall(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets,
 
 	// log any error inserting our channel log, but continue
 	if clog != nil {
-		if _, err := rt.Writers.Main.Queue(clog); err != nil {
+		if _, err := rt.Dynamo.Main.Queue(clog); err != nil {
 			slog.Error("error queuing IVR channel log to writer", "error", err, "channel", channel.UUID())
 		}
 	}
@@ -182,7 +183,7 @@ func RequestCallStart(ctx context.Context, rt *runtime.Runtime, channel *models.
 	statusURL := fmt.Sprintf("https://%s/mr/ivr/c/%s/status", domain, channel.UUID())
 
 	// create the right service
-	svc, err := GetService(channel)
+	svc, err := GetService(rt.HTTP.Services, channel)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create IVR service: %w", err)
 	}
@@ -196,7 +197,7 @@ func RequestCallStart(ctx context.Context, rt *runtime.Runtime, channel *models.
 		clog.HTTP(trace)
 	}
 	if err != nil {
-		clog.Error(&clogs.Error{Message: err.Error()})
+		clog.Error(&svclogs.Error{Message: err.Error()})
 
 		// set our status as errored
 		err := call.UpdateStatus(ctx, rt.DB, models.CallStatusFailed, 0, time.Now())
@@ -277,7 +278,7 @@ func StartCall(
 	scene.DBCall = call
 	scene.Call = flowCall
 
-	if err := scene.AddEvent(ctx, rt, oa, callEvt, models.NilUserID); err != nil {
+	if err := scene.AddEvent(ctx, rt, oa, callEvt, models.NilUserID, ""); err != nil {
 		return fmt.Errorf("error adding call created event: %w", err)
 	}
 
@@ -306,20 +307,23 @@ func ResumeCall(
 	// if call doesn't have an associated session then we shouldn't be here
 	if call.SessionUUID() == "" {
 		return HandleAsFailure(ctx, rt.DB, svc, call, w, errors.New("can't resume call without session"))
+	} else if call.SessionUUID() != mc.CurrentSessionUUID() {
+		// if call's session doesn't match contact's current session then we shouldn't be here either
+		return HandleAsFailure(ctx, rt.DB, svc, call, w, errors.New("call session does not match contact's current session"))
 	}
 
-	contact, err := mc.EngineContact(oa)
-	if err != nil {
-		return fmt.Errorf("error creating flow contact: %w", err)
-	}
-
-	session, err := models.GetWaitingSessionForContact(ctx, rt, oa, contact, call.SessionUUID())
+	session, err := models.GetContactWaitingSession(ctx, rt, oa, mc)
 	if err != nil {
 		return fmt.Errorf("error loading session for contact #%d and call #%d: %w", mc.ID(), call.ID(), err)
 	}
 
 	if session == nil || session.SessionType != models.FlowTypeVoice {
 		return HandleAsFailure(ctx, rt.DB, svc, call, w, fmt.Errorf("no active IVR session for contact"))
+	}
+
+	contact, err := mc.EngineContact(oa)
+	if err != nil {
+		return fmt.Errorf("error creating flow contact: %w", err)
 	}
 
 	flow, err := oa.FlowByUUID(session.CurrentFlowUUID)
@@ -329,7 +333,7 @@ func ResumeCall(
 
 	// check if call has been marked as errored - it maybe have been updated by status callback
 	if call.Status() == models.CallStatusErrored || call.Status() == models.CallStatusFailed {
-		if err = models.ExitSessions(ctx, rt.DB, []flows.SessionUUID{session.UUID}, models.SessionStatusInterrupted); err != nil {
+		if _, err := runner.InterruptWithoutLock(ctx, rt, oa, []*models.Contact{mc}, []*flows.Contact{contact}, map[models.ContactID]flows.SessionUUID{mc.ID(): session.UUID}, flows.SessionStatusInterrupted); err != nil {
 			slog.Error("error interrupting session for errored call", "error", err)
 		}
 
@@ -403,7 +407,7 @@ func ResumeCall(
 	scene.Call = flows.NewCall(call.UUID(), oa.SessionAssets().Channels().Get(channel.UUID()), urn.Identity())
 
 	if resumeEvent != nil {
-		if err := scene.AddEvent(ctx, rt, oa, resumeEvent, models.NilUserID); err != nil {
+		if err := scene.AddEvent(ctx, rt, oa, resumeEvent, models.NilUserID, ""); err != nil {
 			return fmt.Errorf("error adding event: %w", err)
 		}
 	}
@@ -412,22 +416,22 @@ func ResumeCall(
 		return fmt.Errorf("error resuming ivr flow: %w", err)
 	}
 
+	if msg != nil {
+		if err := scene.ApplyModifier(ctx, rt, oa, modifiers.NewSeen(dates.Now()), models.NilUserID, ""); err != nil {
+			return fmt.Errorf("error applying last seen modifier: %w", err)
+		}
+	}
+
 	if err := scene.Commit(ctx, rt, oa); err != nil {
 		return fmt.Errorf("error committing scene: %w", err)
 	}
 
 	// if still active, write out our response
 	if status == models.CallStatusInProgress {
-		err = svc.WriteSessionResponse(ctx, rt, oa, channel, scene, urn, resumeURL, r, w)
-		if err != nil {
+		if err = svc.WriteSessionResponse(ctx, rt, oa, channel, scene, urn, resumeURL, r, w); err != nil {
 			return fmt.Errorf("error writing ivr response for resume: %w", err)
 		}
 	} else {
-		err = models.ExitSessions(ctx, rt.DB, []flows.SessionUUID{session.UUID}, models.SessionStatusCompleted)
-		if err != nil {
-			slog.Error("error closing session", "error", err)
-		}
-
 		return svc.WriteErrorResponse(w, fmt.Errorf("call completed"))
 	}
 

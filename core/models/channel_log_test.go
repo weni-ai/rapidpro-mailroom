@@ -9,10 +9,10 @@ import (
 	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
-	"github.com/nyaruka/mailroom/utils/clogs"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,11 +22,10 @@ func TestChannelLogsOutgoing(t *testing.T) {
 
 	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo)
 
-	defer httpx.SetRequestor(httpx.DefaultRequestor)
-	httpx.SetRequestor(httpx.NewMockRequestor(map[string][]*httpx.MockResponse{
+	mocks := httpx.WithMocks(http.DefaultTransport, map[string][]*httpx.MockResponse{
 		"http://ivr.com/start":  {httpx.NewMockResponse(200, nil, []byte("OK"))},
 		"http://ivr.com/hangup": {httpx.NewMockResponse(400, nil, []byte("Oops"))},
-	}))
+	})
 
 	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
 	require.NoError(t, err)
@@ -38,31 +37,31 @@ func TestChannelLogsOutgoing(t *testing.T) {
 	clog2 := models.NewChannelLog(models.ChannelLogTypeIVRHangup, channel, []string{"sesame"})
 
 	req1, _ := httpx.NewRequest(ctx, "GET", "http://ivr.com/start", nil, map[string]string{"Authorization": "Token sesame"})
-	trace1, err := httpx.DoTrace(http.DefaultClient, req1, nil, nil, -1)
+	trace1, err := svclogs.TraceRequest(mocks, 0, req1)
 	require.NoError(t, err)
 
 	clog1.HTTP(trace1)
 	clog1.End()
 
 	req2, _ := httpx.NewRequest(ctx, "GET", "http://ivr.com/hangup", nil, nil)
-	trace2, err := httpx.DoTrace(http.DefaultClient, req2, nil, nil, -1)
+	trace2, err := svclogs.TraceRequest(mocks, 0, req2)
 	require.NoError(t, err)
 
 	clog2.HTTP(trace2)
-	clog2.Error(&clogs.Error{Message: "oops"})
+	clog2.Error(&svclogs.Error{Message: "oops"})
 	clog2.End()
 
-	_, err = rt.Writers.Main.Queue(clog1)
+	_, err = rt.Dynamo.Main.Queue(clog1)
 	require.NoError(t, err)
-	_, err = rt.Writers.Main.Queue(clog2)
+	_, err = rt.Dynamo.Main.Queue(clog2)
 	require.NoError(t, err)
 
-	rt.Writers.Main.Flush()
+	rt.Dynamo.Main.Flush()
 
-	dyntest.AssertCount(t, rt.Dynamo, "TestMain", 2)
+	dyntest.AssertCount(t, rt.Dynamo.Main.Client(), "TestMain", 2)
 
 	// read log back from DynamoDB
-	item, err := dynamo.GetItem(ctx, rt.Dynamo, "TestMain", clog1.DynamoKey())
+	item, err := dynamo.GetItem(ctx, rt.Dynamo.Main.Client(), "TestMain", clog1.DynamoKey())
 	require.NoError(t, err)
 	if assert.NotNil(t, item) {
 		assert.Equal(t, string(models.ChannelLogTypeIVRStart), item.Data["type"])

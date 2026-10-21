@@ -17,9 +17,9 @@ var AuthGroupIDs = map[string]int{
 }
 
 var Org1 = &Org{1, "bf0514a5-9407-44c9-b0f9-3f36f9c18414"}
-var Admin = &User{3, "e29fdf9f-56ab-422a-b77d-e3ec26091a25"}
-var Editor = &User{4, "ea84a3d7-92e4-4a8b-b01f-db11ff83bbb6"}
-var Agent = &User{5, "27e44553-ab35-482b-a4d4-6f000ec611ab"}
+var Admin = &User{3, "ad9fdf9f-56ab-422a-b77d-e3ec26091a25"}
+var Editor = &User{4, "ed84a3d7-92e4-4a8b-b01f-db11ff83bbb6"}
+var Agent = &User{5, "aee44553-ab35-482b-a4d4-6f000ec611ab"}
 
 var TwilioChannel = &Channel{10000, "74729f45-7f29-4868-9dc4-90e491e3c7d8", "T"}
 var VonageChannel = &Channel{10001, "19012bfd-3ce3-4cae-9bb9-76cf92c73d49", "NX"}
@@ -70,10 +70,6 @@ var SupportTopic = &Topic{10002, "0a8f2e00-fef6-402c-bd79-d789446ec0e0"}
 var Partners = &Team{10001, "4321c30b-b596-46fa-adb4-4a46d37923f6"}
 var Office = &Team{10002, "f14c1762-d38b-4072-ae63-2705332a3719"}
 
-var Luis = &Classifier{10000, "097e026c-ae79-4740-af67-656dbedf0263"}
-var Wit = &Classifier{10001, "ff2a817c-040a-4eb2-8404-7d92e8b79dd0"}
-var Bothub = &Classifier{10002, "859b436d-3005-4e43-9ad5-3de5f26ede4c"}
-
 var OpenAI = &LLM{10000, "62c2bb93-f388-4c72-a2e6-25bee7282240"}
 var Anthropic = &LLM{10001, "43764a92-2545-4aa0-b005-6ade894acc96"}
 var TestLLM = &LLM{10002, "e5d8900a-ef54-4d2a-8214-ff7d3e903502"}
@@ -85,7 +81,7 @@ var RemindersPoint3 = &CampaignPoint{10002, "552a7155-66bc-4323-aad0-8421f87a4e0
 
 // secondary org.. only a few things
 var Org2 = &Org{2, "3ae7cdeb-fd96-46e5-abc4-a4622f349921"}
-var Org2Admin = &User{7, "18afc5e7-e97b-45e5-9850-8896957fef54"}
+var Org2Admin = &User{7, "a2afc5e7-e97b-45e5-9850-8896957fef54"}
 var Org2Channel = &Channel{20000, "a89bc872-3763-4b95-91d9-31d4e56c6651", "T"}
 var Org2Contact = &Contact{20000, "f6d20b72-f7d8-44dc-87f2-aae046dbff95", "tel:+250700000005", 20000}
 var Org2Favorites = &Flow{20000, "f161bd16-3c60-40bd-8c92-228ce815b9cd"}

@@ -25,9 +25,9 @@ import (
 	"github.com/nyaruka/goflow/services/email/smtp"
 	"github.com/nyaruka/goflow/utils"
 	"github.com/nyaruka/goflow/utils/smtpx"
-	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/services/airtime/dtone"
+	"github.com/nyaruka/mailroom/v26/core/goflow"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/services/airtime/dtone"
 	"github.com/nyaruka/null/v3"
 )
 
@@ -49,13 +49,23 @@ func emailServiceFactory(rt *runtime.Runtime) engine.EmailServiceFactory {
 }
 
 func airtimeServiceFactory(rt *runtime.Runtime) engine.AirtimeServiceFactory {
-	// give airtime transfers an extra long timeout
-	airtimeHTTPClient := &http.Client{Timeout: time.Duration(120 * time.Second)}
 	airtimeHTTPRetries := httpx.NewFixedRetries(time.Second*5, time.Second*10)
 
 	return func(sa flows.SessionAssets) (flows.AirtimeService, error) {
-		return orgFromAssets(sa).AirtimeService(airtimeHTTPClient, airtimeHTTPRetries)
+		return orgFromAssets(sa).AirtimeService(rt, rt.HTTP.Services, airtimeHTTPRetries)
 	}
+}
+
+// DTOneCallbackURL returns the URL DT One should POST status updates to, derived from the configured
+// domain. The URL is stable per deployment; correlation back to a specific transfer happens via the
+// airtime_created event UUID that we pass to DT One as their external_id field — the URL itself
+// doesn't carry a secret. Errors if Domain is unset, since handing DT One a broken URL (e.g.
+// https:///mr/airtime/dtone/status) would silently lose every future status update.
+func DTOneCallbackURL(rt *runtime.Runtime) (string, error) {
+	if rt.Config.Domain == "" {
+		return "", fmt.Errorf("Domain must be configured for DT One callbacks")
+	}
+	return fmt.Sprintf("https://%s/mr/airtime/dtone/status", rt.Config.Domain), nil
 }
 
 // OrgID is our type for org ids
@@ -181,14 +191,18 @@ func (o *Org) EmailService(ctx context.Context, rt *runtime.Runtime, retries *sm
 }
 
 // AirtimeService returns the airtime service for this org if one is configured
-func (o *Org) AirtimeService(httpClient *http.Client, httpRetries *httpx.RetryConfig) (flows.AirtimeService, error) {
+func (o *Org) AirtimeService(rt *runtime.Runtime, httpClient *http.Client, httpRetries *httpx.RetryConfig) (flows.AirtimeService, error) {
 	key := o.ConfigValue(configDTOneKey, "")
 	secret := o.ConfigValue(configDTOneSecret, "")
 
 	if key == "" || secret == "" {
 		return nil, fmt.Errorf("missing %s or %s on DTOne configuration for org: %d", configDTOneKey, configDTOneSecret, o.ID())
 	}
-	return dtone.NewService(httpClient, httpRetries, key, secret), nil
+	callbackURL, err := DTOneCallbackURL(rt)
+	if err != nil {
+		return nil, err
+	}
+	return dtone.NewService(httpClient, httpRetries, key, secret, callbackURL), nil
 }
 
 // StoreAttachment saves an attachment to storage
@@ -293,6 +307,23 @@ func GetOrgIDFromUUID(ctx context.Context, db *sql.DB, orgUUID OrgUUID) (OrgID, 
 	}
 
 	return orgID, nil
+}
+
+const sqlSelectActiveOrgIDs = `SELECT id FROM orgs_org WHERE is_active = TRUE ORDER BY id`
+
+// GetActiveOrgIDs returns the IDs of all active orgs
+func GetActiveOrgIDs(ctx context.Context, db Queryer) ([]OrgID, error) {
+	rows, err := db.QueryContext(ctx, sqlSelectActiveOrgIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error querying active org IDs: %w", err)
+	}
+	defer rows.Close()
+
+	ids, err := dbutil.ScanAllSlice(rows, make([]OrgID, 0, 100))
+	if err != nil {
+		return nil, fmt.Errorf("error scanning active org IDs: %w", err)
+	}
+	return ids, nil
 }
 
 const sqlSelectOutboxCounts = `

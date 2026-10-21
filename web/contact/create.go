@@ -6,10 +6,11 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/core/search"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -27,12 +28,14 @@ func init() {
 //	    "urns": ["tel:+250788123123"],
 //	    "fields": {"age": "39"},
 //	    "groups": ["b0b778db-6657-430b-9272-989ad43a10db"]
-//	  }
+//	  },
+//	  "via": "ui"
 //	}
 type createRequest struct {
 	OrgID   models.OrgID        `json:"org_id"   validate:"required"`
 	UserID  models.UserID       `json:"user_id"  validate:"required"`
 	Contact *models.ContactSpec `json:"contact"  validate:"required"`
+	Via     models.Via          `json:"via"      validate:"required,eq=api|eq=ui"`
 }
 
 // handles a request to create the given contact
@@ -52,10 +55,14 @@ func handleCreate(ctx context.Context, rt *runtime.Runtime, r *createRequest) (a
 		return nil, 0, err
 	}
 
-	modifiers := map[flows.ContactUUID][]flows.Modifier{contact.UUID(): c.Mods}
-	_, err = runner.BulkModify(ctx, rt, oa, r.UserID, []*models.Contact{mc}, []*flows.Contact{contact}, modifiers)
+	modifiers := map[models.ContactID][]flows.Modifier{mc.ID(): c.Mods}
+	_, err = runner.ModifyWithoutLock(ctx, rt, oa, r.UserID, []*models.Contact{mc}, []*flows.Contact{contact}, modifiers, r.Via)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error modifying new contact: %w", err)
+	}
+
+	if err := search.IndexContacts(ctx, rt, oa, []*flows.Contact{contact}, nil); err != nil {
+		return nil, 0, fmt.Errorf("error indexing new contact: %w", err)
 	}
 
 	return map[string]any{"contact": contact}, http.StatusOK, nil
