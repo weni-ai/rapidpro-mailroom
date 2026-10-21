@@ -3,6 +3,7 @@ package crons
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -10,20 +11,19 @@ import (
 	"time"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/campaigns"
-	"github.com/nyaruka/mailroom/core/tasks/contacts"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 func init() {
-	Register("contact_fires", &FireContactsCron{FetchBatchSize: 5_000, TaskBatchSize: 100})
+	Register("contact_fires", &FireContactsCron{FetchBatchSize: 5_000, TaskBatchSize: 100, FlowBatchSize: tasks.FlowStartBatchSize})
 }
 
 type FireContactsCron struct {
 	FetchBatchSize int
 	TaskBatchSize  int
+	FlowBatchSize  int
 }
 
 func (c *FireContactsCron) Next(last time.Time) time.Time {
@@ -53,6 +53,10 @@ func (c *FireContactsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[st
 			grouping string
 		}
 		grouped := make(map[orgAndGrouping][]*models.ContactFire, 25)
+
+		// unique campaign point IDs
+		pointIDs := make(map[models.PointID]bool)
+
 		for _, f := range fires {
 			og := orgAndGrouping{orgID: f.OrgID}
 			switch f.Type {
@@ -64,47 +68,56 @@ func (c *FireContactsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[st
 				og.grouping = "session_expires"
 			case models.ContactFireTypeCampaignPoint:
 				og.grouping = "campaign:" + f.Scope
+
+				pointID, _ := c.parseCampaignFireScope(f.Scope)
+				pointIDs[pointID] = true
 			default:
 				return nil, fmt.Errorf("unknown contact fire type: %s", f.Type)
 			}
 			grouped[og] = append(grouped[og], f)
 		}
 
+		// look up point types for all campaign fires in this batch
+		pointTypes, err := models.GetCampaignPointTypes(ctx, rt.DB, slices.Collect(maps.Keys(pointIDs)))
+		if err != nil {
+			return nil, fmt.Errorf("error looking up campaign point types: %w", err)
+		}
+
 		for og, fs := range grouped {
 			for batch := range slices.Chunk(fs, c.TaskBatchSize) {
 				if og.grouping == "wait_timeouts" {
 					// turn wait timeouts into bulk wait timeout tasks
-					ts := make([]*contacts.WaitTimeout, len(batch))
+					ts := make([]*tasks.WaitTimeout, len(batch))
 					for i, f := range batch {
-						ts[i] = &contacts.WaitTimeout{ContactID: f.ContactID, SessionUUID: flows.SessionUUID(f.SessionUUID), SprintUUID: flows.SprintUUID(f.SprintUUID)}
+						ts[i] = &tasks.WaitTimeout{ContactID: f.ContactID, SessionUUID: flows.SessionUUID(f.SessionUUID), SprintUUID: flows.SprintUUID(f.SprintUUID)}
 					}
 
 					// queue to throttled queue but high priority
-					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &contacts.BulkWaitTimeoutTask{Timeouts: ts}, true); err != nil {
+					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &tasks.BulkWaitTimeout{Timeouts: ts}, true); err != nil {
 						return nil, fmt.Errorf("error queuing bulk wait timeout task for org #%d: %w", og.orgID, err)
 					}
 					numWaitTimeouts += len(batch)
 				} else if og.grouping == "wait_expires" {
 					// turn wait expires into bulk wait expire tasks
-					es := make([]*contacts.WaitExpiration, len(batch))
+					es := make([]*tasks.WaitExpiration, len(batch))
 					for i, f := range batch {
-						es[i] = &contacts.WaitExpiration{ContactID: f.ContactID, SessionUUID: flows.SessionUUID(f.SessionUUID), SprintUUID: flows.SprintUUID(f.SprintUUID)}
+						es[i] = &tasks.WaitExpiration{ContactID: f.ContactID, SessionUUID: flows.SessionUUID(f.SessionUUID), SprintUUID: flows.SprintUUID(f.SprintUUID)}
 					}
 
 					// queue to throttled queue but high priority
-					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &contacts.BulkWaitExpireTask{Expirations: es}, true); err != nil {
+					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &tasks.BulkWaitExpire{Expirations: es}, true); err != nil {
 						return nil, fmt.Errorf("error queuing bulk wait expire task for org #%d: %w", og.orgID, err)
 					}
 					numWaitExpires += len(batch)
 				} else if og.grouping == "session_expires" {
 					// turn session timeouts into bulk session expire tasks
-					ss := make([]flows.SessionUUID, len(batch))
+					ss := make([]models.SessionRef, len(batch))
 					for i, f := range batch {
-						ss[i] = flows.SessionUUID(f.SessionUUID)
+						ss[i] = models.SessionRef{UUID: flows.SessionUUID(f.SessionUUID), ContactID: f.ContactID}
 					}
 
-					// queue to throttled queue but high priority
-					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &contacts.BulkSessionExpireTask{SessionUUIDs: ss}, true); err != nil {
+					// queue to batch queue rather than throttled, since expiring sessions can't create more messages
+					if err := tasks.Queue(ctx, rt, rt.Queues.Batch, og.orgID, &tasks.InterruptSessionBatch{Sessions: ss, Status: flows.SessionStatusExpired}, false); err != nil {
 						return nil, fmt.Errorf("error queuing bulk session expire task for org #%d: %w", og.orgID, err)
 					}
 					numSessionExpires += len(batch)
@@ -117,9 +130,17 @@ func (c *FireContactsCron) Run(ctx context.Context, rt *runtime.Runtime) (map[st
 
 					pointID, fireVersion := c.parseCampaignFireScope(strings.TrimPrefix(og.grouping, "campaign:"))
 
-					// queue to throttled queue but high priority
-					if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &campaigns.BulkCampaignTriggerTask{PointID: pointID, FireVersion: fireVersion, ContactIDs: cids}, true); err != nil {
-						return nil, fmt.Errorf("error queuing bulk campaign trigger task for org #%d: %w", og.orgID, err)
+					// flow events get sub-batched into smaller groups
+					cidBatches := [][]models.ContactID{cids}
+					if pointTypes[pointID] == models.PointTypeFlow {
+						cidBatches = slices.Collect(slices.Chunk(cids, c.FlowBatchSize))
+					}
+
+					for _, cidBatch := range cidBatches {
+						// queue to throttled queue but high priority
+						if err := tasks.Queue(ctx, rt, rt.Queues.Throttled, og.orgID, &tasks.BulkCampaignTrigger{PointID: pointID, FireVersion: fireVersion, ContactIDs: cidBatch}, true); err != nil {
+							return nil, fmt.Errorf("error queuing bulk campaign trigger task for org #%d: %w", og.orgID, err)
+						}
 					}
 					numCampaignPoints += len(batch)
 				}

@@ -6,11 +6,11 @@ import (
 	"net/http"
 
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks/realtime"
-	"github.com/nyaruka/mailroom/core/tasks/realtime/ctasks"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/core/tasks/ctasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -61,10 +61,10 @@ func handleHandle(ctx context.Context, rt *runtime.Runtime, r *handleRequest) (a
 
 		urn, _ := cu.Encode(oa)
 
-		err = realtime.QueueTask(ctx, rt, m.OrgID(), m.ContactID(), &ctasks.MsgReceivedTask{
+		err = tasks.QueueContact(ctx, rt, m.OrgID(), m.ContactID(), &ctasks.MsgReceived{
 			ChannelID:     m.ChannelID(),
 			MsgUUID:       m.UUID(),
-			MsgExternalID: m.ExternalID(),
+			MsgExternalID: m.ExternalIdentifier(),
 			URN:           urn,
 			URNID:         m.ContactURNID(),
 			Text:          m.Text(),

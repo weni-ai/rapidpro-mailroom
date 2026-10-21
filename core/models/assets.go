@@ -14,8 +14,8 @@ import (
 	"github.com/nyaruka/goflow/envs"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/engine"
-	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/goflow"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	cache "github.com/patrickmn/go-cache"
 )
 
@@ -24,25 +24,24 @@ type Refresh int
 
 // refresh bit masks
 const (
-	RefreshNone        = Refresh(0)
-	RefreshAll         = Refresh(^0)
-	RefreshOrg         = Refresh(1 << 1)
-	RefreshCampaigns   = Refresh(1 << 2)
-	RefreshChannels    = Refresh(1 << 3)
-	RefreshClassifiers = Refresh(1 << 4)
-	RefreshFields      = Refresh(1 << 5)
-	RefreshFlows       = Refresh(1 << 6)
-	RefreshGlobals     = Refresh(1 << 7)
-	RefreshGroups      = Refresh(1 << 8)
-	RefreshLabels      = Refresh(1 << 9)
-	RefreshLLMs        = Refresh(1 << 10)
-	RefreshLocations   = Refresh(1 << 11)
-	RefreshOptIns      = Refresh(1 << 12)
-	RefreshResthooks   = Refresh(1 << 13)
-	RefreshTemplates   = Refresh(1 << 14)
-	RefreshTopics      = Refresh(1 << 15)
-	RefreshTriggers    = Refresh(1 << 16)
-	RefreshUsers       = Refresh(1 << 17)
+	RefreshNone      = Refresh(0)
+	RefreshAll       = Refresh(^0)
+	RefreshOrg       = Refresh(1 << 1)
+	RefreshCampaigns = Refresh(1 << 2)
+	RefreshChannels  = Refresh(1 << 3)
+	RefreshFields    = Refresh(1 << 5)
+	RefreshFlows     = Refresh(1 << 6)
+	RefreshGlobals   = Refresh(1 << 7)
+	RefreshGroups    = Refresh(1 << 8)
+	RefreshLabels    = Refresh(1 << 9)
+	RefreshLLMs      = Refresh(1 << 10)
+	RefreshLocations = Refresh(1 << 11)
+	RefreshOptIns    = Refresh(1 << 12)
+	RefreshResthooks = Refresh(1 << 13)
+	RefreshTemplates = Refresh(1 << 14)
+	RefreshTopics    = Refresh(1 << 15)
+	RefreshTriggers  = Refresh(1 << 16)
+	RefreshUsers     = Refresh(1 << 17)
 )
 
 // OrgAssets is our top level cache of all things contained in an org. It is used to build
@@ -69,9 +68,6 @@ type OrgAssets struct {
 	channels       []assets.Channel
 	channelsByID   map[ChannelID]*Channel
 	channelsByUUID map[assets.ChannelUUID]*Channel
-
-	classifiers       []assets.Classifier
-	classifiersByUUID map[assets.ClassifierUUID]*Classifier
 
 	fields       []assets.Field // excludes proxy fields
 	fieldsByUUID map[assets.FieldUUID]*Field
@@ -268,20 +264,6 @@ func NewOrgAssets(ctx context.Context, rt *runtime.Runtime, orgID OrgID, prev *O
 		oa.groups = prev.groups
 		oa.groupsByID = prev.groupsByID
 		oa.groupsByUUID = prev.groupsByUUID
-	}
-
-	if prev == nil || refresh&RefreshClassifiers > 0 {
-		oa.classifiers, err = loadAssetType(ctx, db, orgID, "classifiers", loadClassifiers)
-		if err != nil {
-			return nil, fmt.Errorf("error loading classifier assets for org %d: %w", orgID, err)
-		}
-		oa.classifiersByUUID = make(map[assets.ClassifierUUID]*Classifier)
-		for _, c := range oa.classifiers {
-			oa.classifiersByUUID[c.UUID()] = c.(*Classifier)
-		}
-	} else {
-		oa.classifiers = prev.classifiers
-		oa.classifiersByUUID = prev.classifiersByUUID
 	}
 
 	if prev == nil || refresh&RefreshLabels > 0 {
@@ -517,14 +499,6 @@ func (a *OrgAssets) ChannelByID(channelID ChannelID) *Channel {
 	return a.channelsByID[channelID]
 }
 
-func (a *OrgAssets) Classifiers() ([]assets.Classifier, error) {
-	return a.classifiers, nil
-}
-
-func (a *OrgAssets) ClassifierByUUID(classifierUUID assets.ClassifierUUID) *Classifier {
-	return a.classifiersByUUID[classifierUUID]
-}
-
 func (a *OrgAssets) Fields() ([]assets.Field, error) {
 	return a.fields, nil
 }
@@ -537,29 +511,12 @@ func (a *OrgAssets) FieldByKey(key string) *Field {
 	return a.fieldsByKey[key]
 }
 
-// CloneForSimulation clones our org assets for simulation and returns a new org assets with the given flow definitions overrided
-func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, newDefs map[assets.FlowUUID][]byte, testChannels []assets.Channel) (*OrgAssets, error) {
+// CloneForSimulation clones our org assets for simulation and returns a new org assets with extra test channels
+func (a *OrgAssets) CloneForSimulation(ctx context.Context, rt *runtime.Runtime, testChannels []assets.Channel) (*OrgAssets, error) {
 	// only channels and flows can be modified so only refresh those
 	clone, err := NewOrgAssets(context.Background(), a.rt, a.OrgID(), a, RefreshFlows)
 	if err != nil {
 		return nil, err
-	}
-
-	for flowUUID, newDef := range newDefs {
-		// get the original flow
-		flowAsset, err := a.FlowByUUID(flowUUID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to find flow with UUID '%s': %w", flowUUID, err)
-		}
-		f := flowAsset.(*Flow)
-
-		// make a clone of the flow with the provided definition
-		cf := f.cloneWithNewDefinition(newDef)
-
-		clone.flowCacheLock.Lock()
-		clone.flowByUUID[flowUUID] = cf
-		clone.flowByID[cf.ID()] = cf
-		clone.flowCacheLock.Unlock()
 	}
 
 	clone.channels = append(clone.channels, testChannels...)

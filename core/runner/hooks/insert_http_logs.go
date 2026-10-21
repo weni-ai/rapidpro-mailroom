@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
-// InsertHTTPLogs is our hook for inserting classifier logs
+// InsertHTTPLogs is our hook for inserting HTTP logs
 var InsertHTTPLogs runner.PreCommitHook = &insertHTTPLogs{}
 
 type insertHTTPLogs struct{}

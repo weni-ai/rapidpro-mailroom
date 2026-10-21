@@ -18,11 +18,13 @@ import (
 	"github.com/nyaruka/goflow/flows/routers"
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/core/goflow"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/core/search"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,16 +77,20 @@ func (m *ContactActionMap) UnmarshalJSON(d []byte) error {
 	return nil
 }
 
+type ContactModifierMap map[flows.ContactUUID][]json.RawMessage
+
 type TestCase struct {
-	Label           string                             `json:"label"`
-	Msgs            map[flows.ContactUUID]*flows.MsgIn `json:"msgs,omitempty"`
-	BroadcastID     models.BroadcastID                 `json:"broadcast_id,omitempty"`
-	Events          ContactEventMap                    `json:"events"`
-	Actions         ContactActionMap                   `json:"actions,omitempty"`
-	UserID          models.UserID                      `json:"user_id,omitempty"`
-	DBAssertions    []*assertdb.Assert                 `json:"db_assertions,omitempty"`
-	ExpectedTasks   map[string][]testsuite.TaskInfo    `json:"expected_tasks,omitempty"`
-	ExpectedHistory []*dynamo.Item                     `json:"expected_history,omitempty"`
+	Label           string                          `json:"label"`
+	BroadcastID     models.BroadcastID              `json:"broadcast_id,omitempty"`
+	Modifiers       ContactModifierMap              `json:"modifiers,omitempty"`
+	Events          ContactEventMap                 `json:"events"`
+	Actions         ContactActionMap                `json:"actions,omitempty"`
+	UserID          models.UserID                   `json:"user_id,omitempty"`
+	DBAssertions    []*assertdb.Assert              `json:"db_assertions,omitempty"`
+	ExpectedTasks   map[string][]testsuite.TaskInfo `json:"expected_tasks,omitempty"`
+	ExpectedHistory []*dynamo.Item                  `json:"expected_history,omitempty"`
+	IndexedMessages []testsuite.IndexedMessage      `json:"indexed_messages,omitempty"`
+	AssertSearch    []testsuite.SearchAssertion     `json:"assert_search,omitempty"`
 }
 
 func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
@@ -96,7 +102,7 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 
 	models.FlushCache()
 
-	oa, err := models.GetOrgAssets(ctx, rt, models.OrgID(1))
+	oa, err := models.GetOrgAssets(ctx, rt, testdb.Org1.ID)
 	assert.NoError(t, err)
 
 	test.MockUniverse()
@@ -109,17 +115,6 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 			mc, contact, _ := c.Load(t, rt, oa)
 			scenes[i] = runner.NewScene(mc, contact)
 
-			if msg := tc.Msgs[c.UUID]; msg != nil {
-				msgEvent := events.NewMsgReceived(msg)
-				scenes[i].IncomingMsg = insertTestMessage(t, rt, oa, c, msg)
-				err := scenes[i].AddEvent(ctx, rt, oa, msgEvent, models.NilUserID)
-				require.NoError(t, err)
-
-				contact.SetLastSeenOn(msgEvent.CreatedOn())
-
-				msgEvents[i] = msgEvent
-			}
-
 			if tc.BroadcastID != models.NilBroadcastID {
 				bcast, err := models.GetBroadcastByID(ctx, rt.DB, tc.BroadcastID)
 				require.NoError(t, err)
@@ -127,8 +122,27 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 				scenes[i].Broadcast = bcast
 			}
 
+			// apply modifiers first - these update the engine contact and generate events
+			if rawMods := tc.Modifiers[c.UUID]; len(rawMods) > 0 {
+				mods, err := goflow.ReadModifiers(oa.SessionAssets(), rawMods, goflow.ErrorOnMissing)
+				require.NoError(t, err, "%s: error reading modifiers for %s", tc.Label, c.UUID)
+
+				for _, mod := range mods {
+					err = scenes[i].ApplyModifier(ctx, rt, oa, mod, tc.UserID, "")
+					require.NoError(t, err, "%s: error applying modifier for %s", tc.Label, c.UUID)
+				}
+			}
+
 			for _, e := range tc.Events[c.UUID] {
-				err := scenes[i].AddEvent(ctx, rt, oa, e, tc.UserID)
+				if me, ok := e.(*events.MsgReceived); ok {
+					scenes[i].IncomingMsg = insertTestMessage(t, rt, oa, c, me.Msg)
+					contact.SetLastSeenOn(me.CreatedOn())
+					err := scenes[i].DBContact.UpdateLastSeenOn(ctx, rt.DB, me.CreatedOn())
+					require.NoError(t, err, "%s: error updating last_seen_on for %s", tc.Label, c.UUID)
+					msgEvents[i] = me
+				}
+
+				err := scenes[i].AddEvent(ctx, rt, oa, e, tc.UserID, "")
 				require.NoError(t, err)
 			}
 		}
@@ -137,12 +151,15 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 			// reuse id from one of our real flows
 			flowUUID := testdb.Favorites.UUID
 
-			// create dynamic flow to test actions
+			// create dynamic flow definition to test actions
 			testFlow := createTestFlow(t, flowUUID, tc.Actions)
 			flowDef, err := json.Marshal(testFlow)
 			require.NoError(t, err)
 
-			oa, err = oa.CloneForSimulation(ctx, rt, map[assets.FlowUUID][]byte{flowUUID: flowDef}, nil)
+			rt.DB.MustExec(`UPDATE flows_flow SET name = 'Test Flow' WHERE id = $1`, testdb.Favorites.ID)
+			rt.DB.MustExec(`UPDATE flows_flowrevision SET definition = $2 WHERE flow_id = $1`, testdb.Favorites.ID, string(flowDef))
+
+			oa2, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshFlows)
 			assert.NoError(t, err)
 
 			for i, scene := range scenes {
@@ -156,7 +173,7 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 						trig = triggers.NewBuilder(testFlow.Reference(false)).Manual().Build()
 					}
 
-					err = scene.StartSession(ctx, rt, oa, trig, true)
+					err = scene.StartSession(ctx, rt, oa2, trig, true)
 					require.NoError(t, err)
 				}
 			}
@@ -168,7 +185,8 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		// clone test case and populate with actual values
 		actual := tc
 		actual.ExpectedTasks = testsuite.GetQueuedTasks(t, rt)
-		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = testsuite.GetHistoryItems(t, rt, true, test.MockStartTime)
+		actual.IndexedMessages = testsuite.GetIndexedMessages(t, rt, true)
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
 		for i, dba := range tc.DBAssertions {
@@ -192,9 +210,32 @@ func runTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 				tc.ExpectedHistory = []*dynamo.Item{}
 			}
 			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.ExpectedHistory), jsonx.MustMarshal(actual.ExpectedHistory), "%s: event history mismatch", tc.Label)
+
+			if tc.IndexedMessages == nil {
+				tc.IndexedMessages = []testsuite.IndexedMessage{}
+			}
+			if actual.IndexedMessages == nil {
+				actual.IndexedMessages = []testsuite.IndexedMessage{}
+			}
+			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.IndexedMessages), jsonx.MustMarshal(actual.IndexedMessages), "%s: indexed messages mismatch", tc.Label)
+
+			if len(tc.AssertSearch) > 0 {
+				rt.ES.Writer.Flush()
+
+				_, err = rt.ES.Client.Indices.Refresh().Index(rt.Config.ElasticContactsIndex).Do(ctx)
+				require.NoError(t, err)
+
+				for _, sa := range tc.AssertSearch {
+					uuids, err := search.GetContactUUIDsForQuery(ctx, rt, oa, nil, models.ContactStatusActive, sa.Query, -1)
+					assert.NoError(t, err, "%s: search query '%s' failed", tc.Label, sa.Query)
+					assert.ElementsMatch(t, sa.Contacts, uuids, "%s: search query '%s' returned wrong contacts", tc.Label, sa.Query)
+				}
+			}
 		} else {
 			tcs[i] = actual
 		}
+
+		testsuite.Reset(t, rt, testsuite.ResetElastic)
 	}
 
 	// update if we are meant to
@@ -211,7 +252,7 @@ func insertTestMessage(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets, 
 	ch := oa.ChannelByUUID(msg.Channel().UUID)
 	tch := &testdb.Channel{ID: ch.ID(), UUID: ch.UUID(), Type: ch.Type()}
 
-	m := testdb.InsertIncomingMsg(t, rt, testdb.Org1, flows.NewEventUUID(), tch, c, msg.Text(), models.MsgStatusPending)
+	m := testdb.InsertIncomingMsg(t, rt, testdb.Org1, flows.NewEventUUID(), tch, c, msg.Text(), models.MsgStatusPending, "")
 	return &models.MsgInRef{UUID: m.UUID}
 }
 

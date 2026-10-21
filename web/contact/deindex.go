@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/search"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/search"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -19,18 +20,21 @@ func init() {
 //
 //	{
 //	  "org_id": 1,
-//	  "contact_ids": [12345, 23456]
+//	  "contact_uuids": ["548f43fb-f32a-491f-abb7-0c29a453a06e"]
 //	}
 type deindexRequest struct {
-	OrgID      models.OrgID       `json:"org_id"  validate:"required"`
-	ContactIDs []models.ContactID `json:"contact_ids" validate:"required"`
+	OrgID        models.OrgID        `json:"org_id"        validate:"required"`
+	ContactUUIDs []flows.ContactUUID `json:"contact_uuids" validate:"required"`
 }
 
-// handles a request to resend the given messages
 func handleDeindex(ctx context.Context, rt *runtime.Runtime, r *deindexRequest) (any, int, error) {
-	deindexed, err := search.DeindexContactsByID(ctx, rt, r.OrgID, r.ContactIDs)
+	deindexed, err := search.DeindexContactsByUUID(ctx, rt, r.OrgID, r.ContactUUIDs)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error de-indexing contacts in org #%d: %w", r.OrgID, err)
+	}
+
+	if err := search.DeindexMessagesByContact(ctx, rt, r.OrgID, r.ContactUUIDs); err != nil {
+		return nil, 0, fmt.Errorf("error de-indexing messages in org #%d: %w", r.OrgID, err)
 	}
 
 	return map[string]any{"deindexed": deindexed}, http.StatusOK, nil

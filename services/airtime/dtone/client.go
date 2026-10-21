@@ -10,6 +10,7 @@ import (
 
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 
 	"github.com/shopspring/decimal"
 )
@@ -149,8 +150,10 @@ type Transaction struct {
 	} `json:"status"`
 }
 
-// TransactionAsync see https://dvs-api-doc.dtone.com/#tag/Transactions
-func (c *Client) TransactionAsync(ctx context.Context, externalID string, productID int, mobileNumber string) (*Transaction, *httpx.Trace, error) {
+// TransactionAsync see https://dvs-api-doc.dtone.com/#tag/Transactions. With auto_confirm: false the transaction
+// is created in an unconfirmed (held) state — the host must call ConfirmTransaction before DT One will actually
+// send the airtime, otherwise the transaction expires and is auto-cancelled.
+func (c *Client) TransactionAsync(ctx context.Context, externalID string, productID int, mobileNumber, callbackURL string) (*Transaction, *httpx.Trace, error) {
 	var response *Transaction
 
 	type creditPartyIdentifier struct {
@@ -161,11 +164,13 @@ func (c *Client) TransactionAsync(ctx context.Context, externalID string, produc
 		ExternalID            string                `json:"external_id"`
 		ProductID             int                   `json:"product_id"`
 		AutoConfirm           bool                  `json:"auto_confirm"`
+		CallbackURL           string                `json:"callback_url,omitempty"`
 		CreditPartyIdentifier creditPartyIdentifier `json:"credit_party_identifier"`
 	}{
 		ExternalID:  externalID,
 		ProductID:   productID,
-		AutoConfirm: true,
+		AutoConfirm: false,
+		CallbackURL: callbackURL,
 		CreditPartyIdentifier: creditPartyIdentifier{
 			MobileNumber: mobileNumber,
 		},
@@ -179,8 +184,19 @@ func (c *Client) TransactionAsync(ctx context.Context, externalID string, produc
 	return response, trace, nil
 }
 
+// ConfirmTransaction confirms a previously-created transaction so DT One actually sends the airtime.
+// See https://dvs-api-doc.dtone.com/#tag/Transactions/operation/postTransactionConfirm
+func (c *Client) ConfirmTransaction(ctx context.Context, transactionID int64) (*Transaction, *httpx.Trace, error) {
+	var response *Transaction
+	trace, err := c.request(ctx, "POST", fmt.Sprintf("async/transactions/%d/confirm", transactionID), nil, &response)
+	if err != nil {
+		return nil, trace, err
+	}
+	return response, trace, nil
+}
+
 func (c *Client) request(ctx context.Context, method, endpoint string, payload any, response any) (*httpx.Trace, error) {
-	url := apiURL + endpoint
+	endpointURL := apiURL + endpoint
 	headers := map[string]string{}
 	var body io.Reader
 
@@ -193,14 +209,17 @@ func (c *Client) request(ctx context.Context, method, endpoint string, payload a
 		headers["Content-Type"] = "application/json"
 	}
 
-	req, err := httpx.NewRequest(ctx, method, url, body, headers)
+	req, err := httpx.NewRequest(ctx, method, endpointURL, body, headers)
 	if err != nil {
 		return nil, err
 	}
 
 	req.SetBasicAuth(c.key, c.secret)
 
-	trace, err := httpx.DoTrace(c.httpClient, req, c.httpRetries, nil, -1)
+	// trace a single request, retrying per the client's retry config. Composing the tracer outside the retrier
+	// (WithRetries is passed as the tracer's inner transport) captures one trace of the final attempt, with
+	// Trace.Retries set to the number of retries performed.
+	trace, err := svclogs.TraceRequest(httpx.WithRetries(c.httpClient.Transport, c.httpRetries), c.httpClient.Timeout, req)
 	if err != nil {
 		return trace, err
 	}

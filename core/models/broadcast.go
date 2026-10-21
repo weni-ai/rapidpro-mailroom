@@ -11,7 +11,7 @@ import (
 	"github.com/nyaruka/goflow/excellent/types"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/nyaruka/null/v3"
 )
 
@@ -116,7 +116,18 @@ func NewBroadcastFromEvent(ctx context.Context, tx DBorTx, oa *OrgAssets, event 
 		}
 	}
 
-	return NewBroadcast(oa.OrgID(), event.Translations, event.BaseLanguage, false, NilOptInID, groupIDs, contactIDs, event.URNs, event.ContactQuery, NoExclusions, NilUserID), nil
+	// and our template
+	var templateID TemplateID
+	if event.Template != nil {
+		if t := oa.TemplateByUUID(event.Template.UUID); t != nil {
+			templateID = t.ID()
+		}
+	}
+
+	bcast := NewBroadcast(oa.OrgID(), event.Translations, event.BaseLanguage, false, NilOptInID, groupIDs, contactIDs, event.URNs, event.ContactQuery, NoExclusions, NilUserID)
+	bcast.TemplateID = templateID
+	bcast.TemplateVariables = event.TemplateVariables
+	return bcast, nil
 }
 
 // BroadcastBatch represents a batch of contacts that need messages sent for
@@ -310,7 +321,7 @@ func GetBroadcastByID(ctx context.Context, db DBorTx, bcastID BroadcastID) (*Bro
 }
 
 // Send creates a message event for the given contact - can return nil if resultant message has no content and thus is a noop
-func (b *Broadcast) Send(rt *runtime.Runtime, oa *OrgAssets, contact *flows.Contact) (*events.MsgCreated, error) {
+func (b *Broadcast) Send(ctx context.Context, rt *runtime.Runtime, oa *OrgAssets, contact *flows.Contact) (*events.MsgCreated, error) {
 	content, locale := b.Translations.ForContact(oa.Env(), contact, b.BaseLanguage)
 
 	var expressionsContext *types.XObject
@@ -328,7 +339,7 @@ func (b *Broadcast) Send(rt *runtime.Runtime, oa *OrgAssets, contact *flows.Cont
 		return nil, nil
 	}
 
-	out, err := CreateMsgOut(rt, oa, contact, content, b.TemplateID, b.TemplateVariables, locale, expressionsContext)
+	out, err := CreateMsgOut(ctx, rt, oa, contact, content, b.TemplateID, b.TemplateVariables, locale, expressionsContext)
 	if err != nil {
 		return nil, fmt.Errorf("error creating message content: %w", err)
 	}

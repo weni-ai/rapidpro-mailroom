@@ -1,14 +1,12 @@
 package runtime
 
 import (
-	"encoding/csv"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/nyaruka/ezconf"
@@ -28,16 +26,18 @@ type Config struct {
 	Valkey     string `validate:"url,startswith=valkey:"             help:"URL for your Valkey instance"`
 	SentryDSN  string `                                              help:"the DSN used for logging errors to Sentry"`
 
-	Address          string `help:"the address to bind our web server to"`
-	Port             int    `help:"the port to bind our web server to"`
+	PublicAddress    string `help:"the address to bind our public web server to"`
+	PublicPort       int    `help:"the port to bind our public web server to"`
+	InternalAddress  string `help:"the address to bind our internal web server to"`
+	InternalPort     int    `help:"the port to bind our internal web server to"`
 	AuthToken        string `help:"the token clients will need to authenticate web requests"`
 	Domain           string `help:"the domain that mailroom is listening on"`
 	AttachmentDomain string `help:"the domain that will be used for relative attachment"`
 	SpoolDir         string `help:"the directory to use for spool files"`
 
-	WorkersRealtime  int     `help:"the number of workers for the realtime task queue"`
-	WorkersBatch     int     `help:"the number of workers for the batch task queue"`
-	WorkersThrottled int     `help:"the number of workers for the throttled task queue"`
+	WorkersRealtime  int     `help:"the number of workers for the realtime task queue (set to 0 to disable processing of realtime tasks on this node)"`
+	WorkersBatch     int     `help:"the number of workers for the batch task queue (set to 0 to disable processing of batch tasks on this node)"`
+	WorkersThrottled int     `help:"the number of workers for the throttled task queue (set to 0 to disable processing of throttled tasks on this node)"`
 	WorkerOwnerLimit float64 `help:"the maximum number of workers, across nodes, available to a single owner, as a fraction of the per node worker counts"`
 
 	WebhooksTimeout              int     `help:"the timeout in milliseconds for webhook calls from engine"`
@@ -47,16 +47,18 @@ type Config struct {
 	WebhooksBackoffJitter        float64 `help:"the amount of jitter to apply to backoff times"`
 	WebhooksHealthyResponseLimit int     `help:"the limit in milliseconds for webhook response to be considered healthy"`
 
-	SMTPServer           string `help:"the default SMTP configuration for sending flow emails, e.g. smtp://user%40password@server:port/?from=foo%40gmail.com"`
-	DisallowedNetworks   string `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
-	MaxStepsPerSprint    int    `help:"the maximum number of steps allowed per engine sprint"`
-	MaxSprintsPerSession int    `help:"the maximum number of sprints allowed per engine session"`
-	MaxValueLength       int    `help:"the maximum size in characters for contact field values and run result values"`
+	SMTPServer           string   `help:"the default SMTP configuration for sending flow emails, e.g. smtp://user%40password@server:port/?from=foo%40gmail.com"`
+	DisallowedNetworks   []string `help:"comma separated list of IP addresses and networks which engine can't make HTTP calls to"`
+	WebhookProxyURL      string   `validate:"omitempty,http_url" help:"optional URL of a forward HTTP proxy to use for user-controlled webhook calls, e.g. http://proxy.example.com:3128"`
+	MaxStepsPerSprint    int      `help:"the maximum number of steps allowed per engine sprint"`
+	MaxSprintsPerSession int      `help:"the maximum number of sprints allowed per engine session"`
+	MaxValueLength       int      `help:"the maximum size in characters for contact field values and run result values"`
 
-	Elastic              string `validate:"url" help:"the URL of your ElasticSearch instance"`
+	ElasticEndpoint      string `validate:"url" help:"the URL of your ElasticSearch instance"`
 	ElasticUsername      string `help:"the username for ElasticSearch if using basic auth"`
 	ElasticPassword      string `help:"the password for ElasticSearch if using basic auth"`
-	ElasticContactsIndex string `help:"the name of index alias for contacts"`
+	ElasticContactsIndex string `help:"the name of the contacts index written by mailroom"`
+	ElasticMessagesIndex string `help:"the base name for monthly message indexes (e.g. messages-v1 -> messages-v1-2026-02)"`
 
 	AWSAccessKeyID     string `help:"access key ID to use for AWS services"`
 	AWSSecretAccessKey string `help:"secret access key to use for AWS services"`
@@ -68,15 +70,20 @@ type Config struct {
 
 	S3Endpoint          string `help:"S3 service endpoint, e.g. https://s3.amazonaws.com"`
 	S3AttachmentsBucket string `help:"S3 bucket to write attachments to"`
-	S3SessionsBucket    string `help:"S3 bucket to write flow sessions to"`
 	S3PathStyle         bool   `help:"S3 should use path style URLs"`
 
+	CourierEndpoint  string `help:"the base URL used for internal calls to courier" validate:"url"`
+	CourierAuthToken string `help:"the authentication token used for requests to Courier"`
+
+	CentrifugoEndpoint string `help:"the endpoint of the Centrifugo server"`
+	CentrifugoKey      string `help:"the API key for the Centrifugo server"`
+
+	LatencyExcludedOrgs []int  `help:"comma separated list of org IDs to exclude from latency metrics"`
 	MetricsReporting    string `validate:"eq=off|eq=basic|eq=advanced"     help:"the level of metrics reporting"`
 	CloudwatchNamespace string `help:"the namespace to use for cloudwatch metrics"`
 	DeploymentID        string `help:"the deployment identifier to use for metrics"`
 	InstanceID          string `help:"the instance identifier to use for metrics"`
 
-	CourierAuthToken       string `help:"the authentication token used for requests to Courier"`
 	AndroidCredentialsFile string `help:"path to JSON file with FCM service account credentials used to sync Android relayers"`
 	IDObfuscationKey       string `help:"key used to decode obfuscated IDs, as 4 comma separated integers" validate:"omitempty,hexadecimal,len=32"`
 
@@ -88,10 +95,7 @@ type Config struct {
 	DisallowedIPs          []net.IP
 	DisallowedNets         []*net.IPNet
 	IDObfuscationKeyParsed [4]uint32
-	TimeoutTime            int    `help:"the amount of time to between every timeout queued"`
-	WenichatsServiceURL    string `help:"wenichats external api url for ticketer service integration"`
-
-	FlowStartBatchTimeout int `help:"timeout config for flow start batch"`
+	WebhookProxyURLParsed  *url.URL
 }
 
 // NewDefaultConfig returns a new default configuration object
@@ -104,9 +108,13 @@ func NewDefaultConfig() *Config {
 		DBPoolSize: 36,
 		Valkey:     "valkey://valkey:6379/15",
 
-		Address:  "localhost",
-		Port:     8090,
-		SpoolDir: "/var/spool/mailroom",
+		PublicAddress:   "localhost",
+		PublicPort:      8090,
+		InternalAddress: "localhost",
+		InternalPort:    8091,
+		SpoolDir:        "./_spool",
+
+		CourierEndpoint: "http://localhost:8080",
 
 		WorkersRealtime:  32,
 		WorkersBatch:     8,
@@ -118,15 +126,16 @@ func NewDefaultConfig() *Config {
 		WebhooksHealthyResponseLimit: 10000,
 
 		SMTPServer:           "",
-		DisallowedNetworks:   `127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,fe80::/10`,
-		MaxStepsPerSprint:    200,
+		DisallowedNetworks:   []string{`127.0.0.0/8`, `::1`, `fe80::/10`, `fc00::/7`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16`, `0.0.0.0/8`},
+		MaxStepsPerSprint:    250,
 		MaxSprintsPerSession: 250,
 		MaxValueLength:       640,
 
-		Elastic:              "http://elastic:9200",
+		ElasticEndpoint:      "http://elastic:9200",
 		ElasticUsername:      "",
 		ElasticPassword:      "",
-		ElasticContactsIndex: "contacts",
+		ElasticContactsIndex: "contacts-v1",
+		ElasticMessagesIndex: "messages-v1",
 
 		AWSAccessKeyID:     "",
 		AWSSecretAccessKey: "",
@@ -138,10 +147,9 @@ func NewDefaultConfig() *Config {
 
 		S3Endpoint:          "https://s3.amazonaws.com",
 		S3AttachmentsBucket: "temba-attachments",
-		S3SessionsBucket:    "temba-sessions", // for older sessions
 
 		MetricsReporting:    "off",
-		CloudwatchNamespace: "Temba/Mailroom",
+		CloudwatchNamespace: "Mailroom",
 		DeploymentID:        "dev",
 		InstanceID:          hostname,
 
@@ -181,6 +189,15 @@ func (c *Config) Parse() error {
 		return fmt.Errorf("invalid disallowed networks: %w", err)
 	}
 
+	// parse the optional webhook proxy URL (validator already enforced http/https scheme)
+	if c.WebhookProxyURL != "" {
+		u, err := url.Parse(c.WebhookProxyURL)
+		if err != nil {
+			return fmt.Errorf("invalid webhook proxy URL: %w", err)
+		}
+		c.WebhookProxyURLParsed = u
+	}
+
 	// parse our ID obfuscation key
 	bytes, err := hex.DecodeString(c.IDObfuscationKey)
 	if err != nil {
@@ -198,12 +215,7 @@ func (c *Config) Parse() error {
 
 // parses the list of IPs and IP networks (written in CIDR notation)
 func (c *Config) parseDisallowedNetworks() error {
-	addrs, err := csv.NewReader(strings.NewReader(c.DisallowedNetworks)).Read()
-	if err != nil && err != io.EOF {
-		return err
-	}
-
-	ips, nets, err := httpx.ParseNetworks(addrs...)
+	ips, nets, err := httpx.ParseNetworks(c.DisallowedNetworks...)
 	if err != nil {
 		return err
 	}
