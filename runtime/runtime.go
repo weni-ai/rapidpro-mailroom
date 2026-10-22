@@ -7,10 +7,9 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gomodule/redigo/redis"
-	"github.com/vinovest/sqlx"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/s3x"
-	"github.com/nyaruka/mailroom/utils/dynsvc"
+	"github.com/vinovest/sqlx"
 )
 
 // Runtime represents the set of services required to run many Mailroom functions. Used as a wrapper for
@@ -18,8 +17,8 @@ import (
 type Runtime struct {
 	DB         *sqlx.DB
 	ReadonlyDB *sql.DB
-	RP         *redis.Pool
-	Dynamo     *dynsvc.Service
+	VK         *redis.Pool
+	Dynamo     *DynamoTables
 	S3         *s3x.Service
 	ES         *elasticsearch.TypedClient
 	Stats      *StatsCollector

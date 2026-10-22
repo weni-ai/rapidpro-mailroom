@@ -5,33 +5,32 @@ import (
 
 	"github.com/nyaruka/gocommon/dbutil/assertdb"
 	"github.com/nyaruka/gocommon/i18n"
-	_ "github.com/nyaruka/mailroom/core/handlers"
 	"github.com/nyaruka/mailroom/core/models"
 	"github.com/nyaruka/mailroom/core/tasks"
 	"github.com/nyaruka/mailroom/core/tasks/handler"
 	"github.com/nyaruka/mailroom/core/tasks/handler/ctasks"
 	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdata"
+	"github.com/nyaruka/mailroom/testsuite/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestContactChanged(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
-	rc := rt.RP.Get()
+	rc := rt.VK.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(testsuite.ResetAll)
 
 	tcs := []struct {
 		label       string
-		contact     *testdata.Contact
+		contact     *testdb.Contact
 		newURN      *ctasks.NewURNSpec
 		expectedURN []string
 	}{
 		{
 			label:   "append new URN",
-			contact: testdata.Bob,
+			contact: testdb.Bob,
 			newURN: &ctasks.NewURNSpec{
 				Value:  "telegram:98765",
 				Action: "append",
@@ -40,7 +39,7 @@ func TestContactChanged(t *testing.T) {
 		},
 		{
 			label:   "append WhatsApp BSUID",
-			contact: testdata.George,
+			contact: testdb.George,
 			newURN: &ctasks.NewURNSpec{
 				Value:  "whatsapp:US.ABC123",
 				Action: "append",
@@ -52,11 +51,11 @@ func TestContactChanged(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.label, func(t *testing.T) {
 			task := &ctasks.ContactChangedTask{
-				ChannelID: testdata.TwilioChannel.ID,
+				ChannelID: testdb.TwilioChannel.ID,
 				NewURN:    tc.newURN,
 			}
 
-			err := handler.QueueTask(rc, testdata.Org1.ID, tc.contact.ID, task)
+			err := handler.QueueTask(rc, testdb.Org1.ID, tc.contact.ID, task)
 			require.NoError(t, err)
 
 			queued, err := tasks.HandlerQueue.Pop(rc)
@@ -75,29 +74,29 @@ func TestContactChanged(t *testing.T) {
 
 func TestReassignShellOnContactChanged(t *testing.T) {
 	ctx, rt := testsuite.Runtime()
-	rc := rt.RP.Get()
+	rc := rt.VK.Get()
 	defer rc.Close()
 
-	defer testsuite.Reset(testsuite.ResetData)
+	defer testsuite.Reset(testsuite.ResetAll)
 
-	shell := testdata.InsertContact(rt, testdata.Org1, "8b2b8b4c-8e6e-4c96-9e9c-bf6b56a04e37", "Shell", i18n.Language("eng"), models.ContactStatusActive)
-	testdata.InsertContactURN(rt, testdata.Org1, shell, "whatsapp:US.A1B2C3", 1000, nil)
+	shell := testdb.InsertContact(rt, testdb.Org1, "8b2b8b4c-8e6e-4c96-9e9c-bf6b56a04e37", "Shell", i18n.Language("eng"), models.ContactStatusActive)
+	testdb.InsertContactURN(rt, testdb.Org1, shell, "whatsapp:US.A1B2C3", 1000, nil)
 
 	task := &ctasks.ContactChangedTask{
-		ChannelID: testdata.TwilioChannel.ID,
+		ChannelID: testdb.TwilioChannel.ID,
 		NewURN: &ctasks.NewURNSpec{
 			Value:  "whatsapp:US.A1B2C3",
 			Action: "append",
 		},
 	}
 
-	err := handler.QueueTask(rc, testdata.Org1.ID, testdata.Cathy.ID, task)
+	err := handler.QueueTask(rc, testdb.Org1.ID, testdb.Cathy.ID, task)
 	require.NoError(t, err)
 
 	queued, err := tasks.HandlerQueue.Pop(rc)
 	require.NoError(t, err)
 	require.NoError(t, tasks.Perform(ctx, rt, queued))
 
-	assertdb.Query(t, rt.DB, `SELECT contact_id FROM contacts_contacturn WHERE identity = $1`, "whatsapp:US.A1B2C3").Returns(int64(testdata.Cathy.ID))
+	assertdb.Query(t, rt.DB, `SELECT contact_id FROM contacts_contacturn WHERE identity = $1`, "whatsapp:US.A1B2C3").Returns(int64(testdb.Cathy.ID))
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1`, shell.ID).Returns(0)
 }

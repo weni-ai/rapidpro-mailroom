@@ -10,6 +10,7 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
 	"github.com/nyaruka/mailroom/core/models"
+	"github.com/nyaruka/mailroom/core/runner"
 	"github.com/nyaruka/mailroom/runtime"
 )
 
@@ -45,7 +46,7 @@ func (s *NewURNSpec) Apply(ctx context.Context, rt *runtime.Runtime, oa *models.
 	mods := map[*flows.Contact][]flows.Modifier{
 		flowContact: {modifiers.NewURNs([]urns.URN{s.Value}, modifiers.URNsAppend)},
 	}
-	if _, err := models.ApplyModifiers(ctx, rt, oa, models.NilUserID, mods); err != nil {
+	if _, err := runner.ApplyModifiers(ctx, rt, oa, models.NilUserID, mods); err != nil {
 		return fmt.Errorf("error applying URNs modifier: %w", err)
 	}
 	return nil

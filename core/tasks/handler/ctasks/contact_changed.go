@@ -29,7 +29,7 @@ func (t *ContactChangedTask) UseReadOnly() bool {
 }
 
 func (t *ContactChangedTask) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, contact *models.Contact) error {
-	flowContact, err := contact.FlowContact(oa)
+	flowContact, err := contact.EngineContact(oa)
 	if err != nil {
 		return fmt.Errorf("error creating flow contact: %w", err)
 	}
