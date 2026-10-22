@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gomodule/redigo/redis"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/s3x"
 	"github.com/nyaruka/gocommon/jsonx"
@@ -23,6 +22,7 @@ import (
 	"github.com/nyaruka/rp-indexer/v10/indexers"
 	ixruntime "github.com/nyaruka/rp-indexer/v10/runtime"
 	"github.com/nyaruka/vkutil/assertvk"
+	"github.com/vinovest/sqlx"
 )
 
 var _db *sqlx.DB

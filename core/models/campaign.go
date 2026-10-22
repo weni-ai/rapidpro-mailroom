@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/dbutil"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/null/v3"
+	"github.com/vinovest/sqlx"
 )
 
 type CampaignID int

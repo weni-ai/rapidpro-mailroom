@@ -44,7 +44,7 @@ type ContactImport struct {
 	CreatedByID UserID              `db:"created_by_id"`
 	FinishedOn  *time.Time          `db:"finished_on"`
 
-	// we fetch unique batch statuses concatenated as a string, see https://github.com/jmoiron/sqlx/issues/168
+	// we fetch unique batch statuses concatenated as a string, see https://github.com/vinovest/sqlx/issues/168
 	BatchStatuses string `db:"batch_statuses"`
 }
 

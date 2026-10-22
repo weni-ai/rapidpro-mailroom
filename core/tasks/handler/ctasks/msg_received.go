@@ -35,6 +35,7 @@ type MsgReceivedTask struct {
 	Text          string           `json:"text"`
 	Attachments   []string         `json:"attachments,omitempty"`
 	NewContact    bool             `json:"new_contact"`
+	NewURN        *NewURNSpec      `json:"new_urn,omitempty"`
 }
 
 func (t *MsgReceivedTask) Type() string {
@@ -95,6 +96,12 @@ func (t *MsgReceivedTask) perform(ctx context.Context, rt *runtime.Runtime, oa *
 	contact, err := mc.EngineContact(oa)
 	if err != nil {
 		return fmt.Errorf("error creating flow contact: %w", err)
+	}
+
+	if t.NewURN != nil {
+		if err := t.NewURN.Apply(ctx, rt, oa, mc, contact, channel); err != nil {
+			return fmt.Errorf("error applying new URN: %w", err)
+		}
 	}
 
 	// if this is a new or newly unstopped contact, we need to calculate dynamic groups and campaigns

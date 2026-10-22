@@ -22,8 +22,8 @@ type DynamoItem struct {
 }
 
 type DynamoTables struct {
-	Main    *dynamo.Table[DynamoKey, DynamoItem]
-	History *dynamo.Table[DynamoKey, DynamoItem]
+	Main    *Table[DynamoKey, DynamoItem]
+	History *Table[DynamoKey, DynamoItem]
 }
 
 func NewDynamoClient(cfg *Config) (*dynamodb.Client, error) {
@@ -37,7 +37,7 @@ func NewDynamoTables(cfg *Config) (*DynamoTables, error) {
 	}
 
 	return &DynamoTables{
-		Main:    dynamo.NewTable[DynamoKey, DynamoItem](client, cfg.DynamoTablePrefix+"Main"),
-		History: dynamo.NewTable[DynamoKey, DynamoItem](client, cfg.DynamoTablePrefix+"History"),
+		Main:    NewTable[DynamoKey, DynamoItem](client, cfg.DynamoTablePrefix+"Main"),
+		History: NewTable[DynamoKey, DynamoItem](client, cfg.DynamoTablePrefix+"History"),
 	}, nil
 }

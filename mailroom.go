@@ -11,7 +11,6 @@ import (
 	"github.com/appleboy/go-fcm"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jmoiron/sqlx"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 	"github.com/nyaruka/gocommon/aws/s3x"
 	"github.com/nyaruka/mailroom/core/crons"
@@ -19,6 +18,7 @@ import (
 	"github.com/nyaruka/mailroom/runtime"
 	"github.com/nyaruka/mailroom/web"
 	"github.com/nyaruka/vkutil"
+	"github.com/vinovest/sqlx"
 )
 
 // Mailroom is a service for handling RapidPro events
