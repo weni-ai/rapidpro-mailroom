@@ -131,6 +131,20 @@ func TestCreateContact(t *testing.T) {
 	assert.Equal(t, models.ContactStatusBlocked, contact.Status())
 	assert.Equal(t, flows.ContactStatusBlocked, flowContact.Status())
 	assert.Len(t, flowContact.Groups().All(), 0)
+
+	// Ireland: WhatsApp BSUID stays on whatsapp: (not upstream bsuid:)
+	contact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Ireland BSUID", `eng`, models.ContactStatusActive, []urns.URN{urns.URN("whatsapp:US.IRLBSUID001")})
+	assert.NoError(t, err)
+	require.Len(t, contact.URNs(), 1)
+	assert.Equal(t, urns.URN("whatsapp:US.IRLBSUID001"), contact.URNs()[0].Identity)
+	assert.Equal(t, []urns.URN{"whatsapp:US.IRLBSUID001"}, flowContact.URNs().Encode())
+
+	contact, flowContact, err = models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "WA Phone", `eng`, models.ContactStatusActive, []urns.URN{urns.URN("whatsapp:5511987654321")})
+	assert.NoError(t, err)
+	assert.Equal(t, []urns.URN{"whatsapp:5511987654321"}, flowContact.URNs().Encode())
+
+	_, _, err = models.CreateContact(ctx, rt.DB, oa, models.UserID(1), "Parent", `eng`, models.ContactStatusActive, []urns.URN{urns.URN("whatsapp:US.ENT.11815799212886844830")})
+	assert.Error(t, err)
 }
 
 func TestCreateContactRace(t *testing.T) {

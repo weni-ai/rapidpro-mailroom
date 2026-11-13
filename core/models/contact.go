@@ -420,8 +420,8 @@ func (u *ContactURN) Encode(oa *OrgAssets) (urns.URN, error) {
 		}
 	}
 
-	// re-encode our URN
-	urn, err := urns.NewFromParts(u.Scheme, u.Path, query, string(u.Display))
+	// re-encode our URN (Ireland whatsapp: BSUID paths are accepted via URNFromParts)
+	urn, err := URNFromParts(u.Scheme, u.Path, query, string(u.Display))
 	if err != nil {
 		return urns.NilURN, fmt.Errorf("invalid URN %s:%s: %w", u.Scheme, u.Path, err)
 	}
@@ -827,8 +827,8 @@ func insertContactAndURNs(ctx context.Context, db DBorTx, orgID OrgID, userID Us
 func nornalizeAndValidateURNs(urnz []urns.URN) ([]urns.URN, error) {
 	norm := make([]urns.URN, len(urnz))
 	for i, urn := range urnz {
-		norm[i] = urn.Normalize()
-		if err := norm[i].Validate(); err != nil {
+		norm[i] = NormalizeURN(urn)
+		if err := ValidateURN(norm[i]); err != nil {
 			return nil, NewURNInvalidError(i, err)
 		}
 	}

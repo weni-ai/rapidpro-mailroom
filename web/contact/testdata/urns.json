@@ -22,7 +22,11 @@
                 "tel:1234",
                 "tel:[[[",
                 "xyz:2345",
-                "abc"
+                "abc",
+                "whatsapp:US.IRLBSUID001",
+                "whatsapp:us.abcDEF123",
+                "whatsapp:5511987654321",
+                "whatsapp:US.ENT.11815799212886844830"
             ]
         },
         "status": 200,
@@ -56,6 +60,19 @@
                 {
                     "normalized": ":abc",
                     "error": "scheme or path cannot be empty"
+                },
+                {
+                    "normalized": "whatsapp:US.IRLBSUID001"
+                },
+                {
+                    "normalized": "whatsapp:US.abcDEF123"
+                },
+                {
+                    "normalized": "whatsapp:5511987654321"
+                },
+                {
+                    "normalized": "whatsapp:US.ENT.11815799212886844830",
+                    "error": "invalid path component"
                 }
             ]
         }
