@@ -1,10 +1,16 @@
 package runtime
 
 import (
+	"fmt"
+	"log/slog"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/aws/cwatch"
 )
 
@@ -14,11 +20,12 @@ type LLMTypeAndModel struct {
 }
 
 type Stats struct {
-	RealtimeTaskCount    map[string]int           // number of contact tasks handled by type
-	RealtimeTaskErrors   map[string]int           // number of contact tasks that errored by type
-	RealtimeTaskDuration map[string]time.Duration // total time spent handling contact tasks
-	RealtimeTaskLatency  map[string]time.Duration // total time spent queuing and handling contact tasks
-	RealtimeLockFails    int                      // number of times an attempt to get a contact lock failed
+	ContactTaskCount        map[string]int           // number of contact tasks handled by type
+	ContactTaskErrors       map[string]int           // number of contact tasks that errored by type
+	ContactTaskDuration     map[string]time.Duration // total time spent handling contact tasks
+	ContactTaskLatency      map[string]time.Duration // total time spent queuing and handling contact tasks (excluding excluded orgs)
+	ContactTaskLatencyCount map[string]int           // number of contact tasks whose latency was included in ContactTaskLatency
+	RealtimeLockFails       int                      // number of times an attempt to get a contact lock failed
 
 	CronTaskCount    map[string]int           // number of cron tasks run by type
 	CronTaskDuration map[string]time.Duration // total time spent running cron tasks
@@ -28,37 +35,51 @@ type Stats struct {
 
 	WebhookCallCount    int           // number of webhook calls
 	WebhookCallDuration time.Duration // total time spent handling webhook calls
+
+	SearchCount    map[string]int           // number of ES searches by index (contacts/messages)
+	SearchDuration map[string]time.Duration // total time spent on ES searches by index
 }
 
 func newStats() *Stats {
 	return &Stats{
-		RealtimeTaskCount:    make(map[string]int),
-		RealtimeTaskErrors:   make(map[string]int),
-		RealtimeTaskDuration: make(map[string]time.Duration),
-		RealtimeTaskLatency:  make(map[string]time.Duration),
+		ContactTaskCount:        make(map[string]int),
+		ContactTaskErrors:       make(map[string]int),
+		ContactTaskDuration:     make(map[string]time.Duration),
+		ContactTaskLatency:      make(map[string]time.Duration),
+		ContactTaskLatencyCount: make(map[string]int),
 
 		CronTaskCount:    make(map[string]int),
 		CronTaskDuration: make(map[string]time.Duration),
 
 		LLMCallCount:    make(map[LLMTypeAndModel]int),
 		LLMCallDuration: make(map[LLMTypeAndModel]time.Duration),
+
+		SearchCount:    make(map[string]int),
+		SearchDuration: make(map[string]time.Duration),
 	}
 }
 
 func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 	metrics := make([]types.MetricDatum, 0, 20)
 
-	for typ, count := range s.RealtimeTaskCount {
+	for typ, count := range s.ContactTaskCount {
 		// convert task timings to averages
-		avgDuration := s.RealtimeTaskDuration[typ] / time.Duration(count)
-		avgLatency := s.RealtimeTaskLatency[typ] / time.Duration(count)
+		avgDuration := s.ContactTaskDuration[typ] / time.Duration(count)
+		typDim := cwatch.Dimension("TaskType", typ)
 
 		metrics = append(metrics,
-			cwatch.Datum("HandlerTaskCount", float64(count), types.StandardUnitCount, cwatch.Dimension("TaskType", typ)),
-			cwatch.Datum("HandlerTaskErrors", float64(s.RealtimeTaskErrors[typ]), types.StandardUnitCount, cwatch.Dimension("TaskType", typ)),
-			cwatch.Datum("HandlerTaskDuration", float64(avgDuration)/float64(time.Second), types.StandardUnitCount, cwatch.Dimension("TaskType", typ)),
-			cwatch.Datum("HandlerTaskLatency", float64(avgLatency)/float64(time.Second), types.StandardUnitCount, cwatch.Dimension("TaskType", typ)),
+			cwatch.Datum("HandlerTaskCount", float64(count), types.StandardUnitCount, typDim),
+			cwatch.Datum("HandlerTaskErrors", float64(s.ContactTaskErrors[typ]), types.StandardUnitCount, typDim),
+			cwatch.Datum("HandlerTaskDuration", float64(avgDuration)/float64(time.Second), types.StandardUnitCount, typDim),
 		)
+
+		// latency average uses its own count because tasks from excluded orgs aren't added to the sum
+		if latencyCount := s.ContactTaskLatencyCount[typ]; latencyCount > 0 {
+			avgLatency := s.ContactTaskLatency[typ] / time.Duration(latencyCount)
+			metrics = append(metrics,
+				cwatch.Datum("HandlerTaskLatency", float64(avgLatency)/float64(time.Second), types.StandardUnitCount, typDim),
+			)
+		}
 	}
 
 	for typeAndModel, count := range s.LLMCallCount {
@@ -80,6 +101,15 @@ func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 		cwatch.Datum("WebhookCallDuration", float64(avgWebhookDuration)/float64(time.Second), types.StandardUnitSeconds),
 	)
 
+	for index, count := range s.SearchCount {
+		avgDuration := s.SearchDuration[index] / time.Duration(count)
+
+		metrics = append(metrics,
+			cwatch.Datum("SearchCount", float64(count), types.StandardUnitCount, cwatch.Dimension("Index", index)),
+			cwatch.Datum("SearchDuration", float64(avgDuration)/float64(time.Second), types.StandardUnitSeconds, cwatch.Dimension("Index", index)),
+		)
+	}
+
 	if advanced {
 		metrics = append(metrics,
 			cwatch.Datum("HandlerLockFails", float64(s.RealtimeLockFails), types.StandardUnitCount),
@@ -100,24 +130,35 @@ func (s *Stats) ToMetrics(advanced bool) []types.MetricDatum {
 
 // StatsCollector provides threadsafe stats collection
 type StatsCollector struct {
-	mutex sync.Mutex
-	stats *Stats
+	vk           *valkey.Pool
+	excludedOrgs map[int]bool
+	mutex        sync.Mutex
+	stats        *Stats
 }
 
 // NewStatsCollector creates a new stats collector
-func NewStatsCollector() *StatsCollector {
-	return &StatsCollector{stats: newStats()}
+func NewStatsCollector(vk *valkey.Pool, excludedOrgs []int) *StatsCollector {
+	excluded := make(map[int]bool, len(excludedOrgs))
+	for _, id := range excludedOrgs {
+		excluded[id] = true
+	}
+	return &StatsCollector{vk: vk, excludedOrgs: excluded, stats: newStats()}
 }
 
-func (c *StatsCollector) RecordRealtimeTask(typ string, d, l time.Duration, errored bool) {
+func (c *StatsCollector) RecordContactTask(typ string, orgID int, d, l time.Duration, errored bool) {
 	c.mutex.Lock()
-	c.stats.RealtimeTaskCount[typ]++
-	c.stats.RealtimeTaskDuration[typ] += d
-	c.stats.RealtimeTaskLatency[typ] += l
+	c.stats.ContactTaskCount[typ]++
+	c.stats.ContactTaskDuration[typ] += d
+	if !c.excludedOrgs[orgID] {
+		c.stats.ContactTaskLatency[typ] += l
+		c.stats.ContactTaskLatencyCount[typ]++
+	}
 	if errored {
-		c.stats.RealtimeTaskErrors[typ]++
+		c.stats.ContactTaskErrors[typ]++
 	}
 	c.mutex.Unlock()
+
+	c.recordCTaskLatency(orgID, typ, l)
 }
 
 func (c *StatsCollector) RecordRealtimeLockFail() {
@@ -140,6 +181,13 @@ func (c *StatsCollector) RecordWebhookCall(d time.Duration) {
 	c.mutex.Unlock()
 }
 
+func (c *StatsCollector) RecordSearch(index string, d time.Duration) {
+	c.mutex.Lock()
+	c.stats.SearchCount[index]++
+	c.stats.SearchDuration[index] += d
+	c.mutex.Unlock()
+}
+
 func (c *StatsCollector) RecordLLMCall(typ, model string, d time.Duration) {
 	c.mutex.Lock()
 	c.stats.LLMCallCount[LLMTypeAndModel{typ, model}]++
@@ -154,4 +202,139 @@ func (c *StatsCollector) Extract() *Stats {
 	s := c.stats
 	c.stats = newStats()
 	return s
+}
+
+var recordLatencyScript = valkey.NewScript(1, `
+local key = KEYS[1]
+local field_n = ARGV[1]
+local field_t = ARGV[2]
+local latency_ms = tonumber(ARGV[3])
+
+redis.call("HINCRBY", key, field_n, 1)
+redis.call("HINCRBY", key, field_t, latency_ms)
+redis.call("EXPIRE", key, 90000)
+
+return 1
+`)
+
+// records a contact task's latency in Valkey, keyed by org and task type (best effort).
+func (c *StatsCollector) recordCTaskLatency(orgID int, taskType string, latency time.Duration) {
+	vc := c.vk.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
+	field := fmt.Sprintf("%d/%s", orgID, taskType)
+
+	if _, err := recordLatencyScript.Do(vc, key, field+":n", field+":t", latency.Milliseconds()); err != nil {
+		slog.Error("error recording per-org latency", "error", err)
+	}
+}
+
+// OrgCTaskLatency holds latency statistics for all contact task types for a single org
+type OrgCTaskLatency struct {
+	OrgID   int           `json:"org_id"`
+	TotalMS int64         `json:"total_ms"`
+	Tasks   []TaskLatency `json:"tasks"`
+}
+
+// TaskLatency holds latency statistics for a single contact task type
+type TaskLatency struct {
+	Type    string `json:"type"`
+	Count   int64  `json:"count"`
+	TotalMS int64  `json:"total_ms"`
+	AvgMS   int64  `json:"avg_ms"`
+}
+
+// GetCTaskLatencies returns per-org latency statistics for the current hourly bucket, grouped by
+// org and sorted by org total latency descending. Tasks within each org are sorted by total latency
+// descending.
+func GetCTaskLatencies(rp *valkey.Pool) ([]OrgCTaskLatency, error) {
+	vc := rp.Get()
+	defer vc.Close()
+
+	key := fmt.Sprintf("ctask_latency:%s", time.Now().UTC().Format("2006-01-02T15"))
+
+	values, err := valkey.Values(vc.Do("HGETALL", key))
+	if err != nil {
+		return nil, fmt.Errorf("error getting latency data: %w", err)
+	}
+
+	type entryKey struct {
+		orgID    int
+		taskType string
+	}
+	type entry struct {
+		count   int64
+		totalMS int64
+	}
+	entries := make(map[entryKey]*entry)
+
+	for i := 0; i < len(values); i += 2 {
+		field, _ := valkey.String(values[i], nil)
+		val, _ := valkey.Int64(values[i+1], nil)
+
+		// field format is "{orgID}/{taskType}:n" or "{orgID}/{taskType}:t"
+		suffixIdx := strings.LastIndex(field, ":")
+		if suffixIdx == -1 {
+			continue
+		}
+		prefix := field[:suffixIdx]
+		suffix := field[suffixIdx+1:]
+
+		before, after, ok := strings.Cut(prefix, "/")
+		if !ok {
+			continue
+		}
+
+		orgID, err := strconv.Atoi(before)
+		if err != nil {
+			continue
+		}
+
+		ek := entryKey{orgID, after}
+		e, ok := entries[ek]
+		if !ok {
+			e = &entry{}
+			entries[ek] = e
+		}
+
+		switch suffix {
+		case "n":
+			e.count = val
+		case "t":
+			e.totalMS = val
+		}
+	}
+
+	// group by org
+	orgs := make(map[int]*OrgCTaskLatency)
+	for ek, e := range entries {
+		org, ok := orgs[ek.orgID]
+		if !ok {
+			org = &OrgCTaskLatency{OrgID: ek.orgID}
+			orgs[ek.orgID] = org
+		}
+
+		var avgMS int64
+		if e.count > 0 {
+			avgMS = e.totalMS / e.count
+		}
+
+		org.TotalMS += e.totalMS
+		org.Tasks = append(org.Tasks, TaskLatency{Type: ek.taskType, Count: e.count, TotalMS: e.totalMS, AvgMS: avgMS})
+	}
+
+	result := make([]OrgCTaskLatency, 0, len(orgs))
+	for _, org := range orgs {
+		sort.Slice(org.Tasks, func(i, j int) bool {
+			return org.Tasks[i].TotalMS > org.Tasks[j].TotalMS
+		})
+		result = append(result, *org)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].TotalMS > result[j].TotalMS
+	})
+
+	return result, nil
 }

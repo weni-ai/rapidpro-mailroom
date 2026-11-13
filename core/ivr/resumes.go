@@ -13,8 +13,8 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 type ResumeType string
@@ -101,7 +101,7 @@ func buildMsgResume(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAsse
 	}
 
 	msgIn := flows.NewMsgIn(urn, channel.Reference(), resume.Input, attachments, "")
-	msgEvt := events.NewMsgReceived(msgIn)
+	msgEvt := events.NewMsgReceived(msgIn, "")
 	msgEvt.UUID_ = msgUUID
 
 	// we currently model timeouts as empty messages.. if we have one of those, don't save it

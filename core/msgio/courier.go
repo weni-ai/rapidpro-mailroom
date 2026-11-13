@@ -5,28 +5,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/dates"
-	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/gocommon/urns"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/utils/clogs"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 )
-
-var courierHttpClient = &http.Client{
-	Timeout: 1 * time.Minute, // big so we let courier determine when things timeout
-}
 
 const (
 	bulkPriority = 0
@@ -46,7 +43,7 @@ type Contact struct {
 	ID         models.ContactID  `json:"id"`
 	UUID       flows.ContactUUID `json:"uuid"`
 	LastSeenOn *time.Time        `json:"last_seen_on,omitempty"`
-	OtherURNs  []urns.URN        `json:"other_urns,omitempty"`
+	OtherURNs  []urns.URN        `json:"other_urns,omitempty"` // currently needed for WA handlers to know if contact already has a BSUID URN, may not be needed long term
 }
 
 type OptInRef struct {
@@ -71,20 +68,6 @@ type Session struct {
 	Status     string            `json:"status"`
 	SprintUUID flows.SprintUUID  `json:"sprint_uuid"`
 	Timeout    int               `json:"timeout,omitempty"`
-}
-
-// otherURNs returns the identities of all URNs on the contact except the one being sent to
-func otherURNs(mo *models.MsgOut) []urns.URN {
-	if mo.Contact == nil {
-		return nil
-	}
-	var others []urns.URN
-	for _, u := range mo.Contact.URNs() {
-		if mo.URN == nil || u.ID != mo.URN.ID {
-			others = append(others, u.Identity)
-		}
-	}
-	return others
 }
 
 var sessionStatusMap = map[flows.SessionStatus]string{flows.SessionStatusWaiting: "W", flows.SessionStatusCompleted: "C"}
@@ -113,6 +96,17 @@ type Msg struct {
 	IsResend             bool               `json:"is_resend,omitempty"`
 	PrevAttempts         int                `json:"prev_attempts,omitempty"`
 	Session              *Session           `json:"session,omitempty"`
+}
+
+// otherURNs returns the identities of all URNs on the contact except the one being sent to
+func otherURNs(mo *models.MsgOut) []urns.URN {
+	var others []urns.URN
+	for _, u := range mo.Contact.URNs() {
+		if u.ID != mo.URN.ID {
+			others = append(others, u.Identity)
+		}
+	}
+	return others
 }
 
 // NewCourierMsg creates a courier message in the format it's expecting to be queued
@@ -202,7 +196,7 @@ func NewCourierMsg(oa *models.OrgAssets, mo *models.MsgOut, ch *models.Channel) 
 	return msg, nil
 }
 
-var queuePushScript = redis.NewScript(6, `
+var queuePushScript = valkey.NewScript(6, `
 -- KEYS: [QueueType, QueueName, TPS, Priority, Items, EpochSecs]
 local queueType, queueName, tps, priority, items, epochSecs = KEYS[1], KEYS[2], tonumber(KEYS[3]), KEYS[4], KEYS[5], KEYS[6]
 
@@ -232,7 +226,7 @@ end
 `)
 
 // PushCourierBatch pushes a batch of messages for a single contact and channel onto the appropriate courier queue
-func PushCourierBatch(vc redis.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
+func PushCourierBatch(vc valkey.Conn, oa *models.OrgAssets, ch *models.Channel, msgs []*models.MsgOut, timestamp string) error {
 	priority := bulkPriority
 	if msgs[0].HighPriority() {
 		priority = highPriority
@@ -254,7 +248,7 @@ func PushCourierBatch(vc redis.Conn, oa *models.OrgAssets, ch *models.Channel, m
 }
 
 // QueueCourierMessages queues messages for a single contact to Courier
-func QueueCourierMessages(vc redis.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
+func QueueCourierMessages(vc valkey.Conn, oa *models.OrgAssets, contactID models.ContactID, channel *models.Channel, msgs []*models.MsgOut) error {
 	if len(msgs) == 0 {
 		return nil
 	}
@@ -304,7 +298,7 @@ func QueueCourierMessages(vc redis.Conn, oa *models.OrgAssets, contactID models.
 	return commitBatch()
 }
 
-var queueClearScript = redis.NewScript(3, `
+var queueClearScript = valkey.NewScript(3, `
 -- KEYS: [QueueType, QueueName, TPS]
 local queueType, queueName, tps = KEYS[1], KEYS[2], tonumber(KEYS[3])
 
@@ -320,7 +314,7 @@ redis.call("ZADD", queueType .. ":active", 0, queueKey)
 `)
 
 // ClearCourierQueues clears the courier queues (priority and bulk) for the given channel
-func ClearCourierQueues(vc redis.Conn, ch *models.Channel) error {
+func ClearCourierQueues(vc valkey.Conn, ch *models.Channel) error {
 	_, err := queueClearScript.Do(vc, "msgs", ch.UUID(), ch.TPS())
 	return err
 }
@@ -339,29 +333,37 @@ type fetchAttachmentResponse struct {
 		URL         string `json:"url"`
 		Size        int    `json:"size"`
 	} `json:"attachment"`
-	LogUUID clogs.UUID `json:"log_uuid"`
+	LogUUID svclogs.UUID `json:"log_uuid"`
 }
 
 // FetchAttachment calls courier to fetch the given attachment
-func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgUUID flows.EventUUID) (utils.Attachment, clogs.UUID, error) {
+func FetchAttachment(ctx context.Context, rt *runtime.Runtime, ch *models.Channel, attURL string, msgUUID flows.EventUUID) (utils.Attachment, svclogs.UUID, error) {
 	payload := jsonx.MustMarshal(&fetchAttachmentRequest{
 		ChannelType: ch.Type(),
 		ChannelUUID: ch.UUID(),
 		URL:         attURL,
 		MsgUUID:     msgUUID,
 	})
-	req, _ := http.NewRequest("POST", fmt.Sprintf("https://%s/c/_fetch-attachment", rt.Config.Domain), bytes.NewReader(payload))
+	req, _ := http.NewRequest("POST", strings.TrimRight(rt.Config.CourierEndpoint, "/")+"/ci/attachment/fetch", bytes.NewReader(payload))
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.Config.CourierAuthToken))
 
-	resp, err := httpx.DoTrace(courierHttpClient, req, nil, nil, -1)
+	// this is an internal request to courier whose trace we don't persist, so a plain fetch is enough; the
+	// shared services client's 1-minute timeout is big enough that courier determines when things time out
+	resp, err := rt.HTTP.Services.Do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("error calling courier endpoint: %w", err)
 	}
-	if resp.Response.StatusCode != 200 {
-		return "", "", fmt.Errorf("error calling courier endpoint, got non-200 status: %s", string(resp.ResponseTrace))
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("error reading courier response: %w", err)
+	}
+	if resp.StatusCode != 200 {
+		return "", "", fmt.Errorf("error calling courier endpoint, got non-200 status: %s", string(body))
 	}
 	fa := &fetchAttachmentResponse{}
-	if err := json.Unmarshal(resp.ResponseBody, fa); err != nil {
+	if err := json.Unmarshal(body, fa); err != nil {
 		return "", "", fmt.Errorf("error unmarshaling courier response: %w", err)
 	}
 

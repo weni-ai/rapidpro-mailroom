@@ -6,11 +6,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/tasks"
-	"github.com/nyaruka/mailroom/core/tasks/msgs"
-	"github.com/nyaruka/mailroom/core/tasks/starts"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/tasks"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 func init() {
@@ -79,7 +77,7 @@ func (c *FireSchedulesCron) Run(ctx context.Context, rt *runtime.Runtime) (map[s
 			}
 
 			// add our task to send this broadcast
-			task = &msgs.SendBroadcastTask{Broadcast: bcast}
+			task = &tasks.SendBroadcast{Broadcast: bcast}
 			broadcasts++
 
 		} else if s.Trigger != nil {
@@ -95,7 +93,7 @@ func (c *FireSchedulesCron) Run(ctx context.Context, rt *runtime.Runtime) (map[s
 			}
 
 			// add our flow start task
-			task = &starts.StartFlowTask{FlowStart: start}
+			task = &tasks.StartFlow{FlowStart: start}
 			triggers++
 		} else {
 			log.Error("schedule found with no associated active broadcast or trigger")

@@ -1,0 +1,98 @@
+package ctasks
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"github.com/nyaruka/goflow/flows"
+	"github.com/nyaruka/goflow/flows/events"
+	"github.com/nyaruka/goflow/flows/resumes"
+	"github.com/nyaruka/mailroom/v26/core/ivr"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
+)
+
+const TypeWaitExpired = "wait_expired"
+
+func init() {
+	RegisterType(TypeWaitExpired, func() Task { return &WaitExpired{} })
+}
+
+type WaitExpired struct {
+	SessionUUID flows.SessionUUID `json:"session_uuid"`
+	SprintUUID  flows.SprintUUID  `json:"sprint_uuid"`
+}
+
+func (t *WaitExpired) Type() string {
+	return TypeWaitExpired
+}
+
+func (t *WaitExpired) Perform(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, mc *models.Contact) error {
+	log := slog.With("ctask", "wait_expired", "contact_id", mc.ID(), "session_uuid", t.SessionUUID)
+
+	// if contact's current session has already changed, noop
+	if mc.CurrentSessionUUID() != t.SessionUUID {
+		log.Debug("skipping as contact's current session has changed")
+		return nil
+	}
+
+	// look for a waiting session for this contact
+	session, err := models.GetContactWaitingSession(ctx, rt, oa, mc)
+	if err != nil {
+		return fmt.Errorf("error loading waiting session for contact %s: %w", mc.UUID(), err)
+	}
+
+	// if we didn't find a session or if it's been modified since, ignore this task
+	if session == nil || session.LastSprintUUID != t.SprintUUID {
+		log.Debug("skipping as waiting session has changed")
+		return nil
+	}
+
+	// build our flow contact
+	contact, err := mc.EngineContact(oa)
+	if err != nil {
+		return fmt.Errorf("error creating flow contact: %w", err)
+	}
+
+	evt := events.NewWaitExpired()
+
+	if session.SessionType == models.FlowTypeVoice {
+		// load our call
+		call, err := models.GetCallByUUID(ctx, rt.DB, oa.OrgID(), session.CallUUID)
+		if err != nil {
+			return fmt.Errorf("error loading call for voice session: %w", err)
+		}
+
+		// hang up our call
+		clog, err := ivr.HangupCall(ctx, rt, call)
+		if err != nil {
+			return fmt.Errorf("error hanging up call for voice session: %w", err)
+		}
+
+		if clog != nil {
+			if _, err := rt.Dynamo.Main.Queue(clog); err != nil {
+				return fmt.Errorf("error queuing IVR channel log to writer: %w", err)
+			}
+		}
+
+		scene := runner.NewScene(mc, contact)
+		if err := scene.InterruptWaiting(ctx, rt, oa, flows.SessionStatusExpired); err != nil {
+			return fmt.Errorf("error expiring voice session: %w", err)
+		}
+
+		return scene.Commit(ctx, rt, oa)
+	}
+
+	scene := runner.NewScene(mc, contact)
+	if err := scene.AddEvent(ctx, rt, oa, evt, models.NilUserID, ""); err != nil {
+		return fmt.Errorf("error adding wait expired event to scene: %w", err)
+	}
+
+	if err := scene.ResumeSession(ctx, rt, oa, session, resumes.NewWaitExpiration(evt)); err != nil {
+		return fmt.Errorf("error resuming flow for expiration: %w", err)
+	}
+
+	return scene.Commit(ctx, rt, oa)
+}

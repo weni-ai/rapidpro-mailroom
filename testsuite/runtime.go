@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"maps"
 	"os"
 	"os/exec"
 	"path"
@@ -13,19 +12,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/nyaruka/gocommon/aws/dynamo/dyntest"
-	"github.com/nyaruka/mailroom/core/goflow"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/rp-indexer/v10/indexers"
-	ixruntime "github.com/nyaruka/rp-indexer/v10/runtime"
+	"github.com/nyaruka/mailroom/v26/core/goflow"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	elasticURL           = "http://elastic:9200"
-	elasticContactsIndex = "test_contacts"
-	postgresDumpPath     = "./testsuite/testdata/postgres.dump"
-	dynamoTablesPath     = "./testsuite/testdata/dynamo.json"
+	postgresDumpPath = "./testsuite/testdata/postgres.dump"
+	dynamoTablesPath = "./testsuite/testdata/dynamo.json"
 )
 
 // Refresh is our type for the pieces of org assets we want fresh (not cached)
@@ -39,8 +34,8 @@ const (
 	ResetData    = ResetFlag(1 << 2)
 	ResetValkey  = ResetFlag(1 << 3)
 	ResetStorage = ResetFlag(1 << 4)
-	ResetElastic = ResetFlag(1 << 5)
-	ResetDynamo  = ResetFlag(1 << 6)
+	ResetDynamo  = ResetFlag(1 << 5)
+	ResetElastic = ResetFlag(1 << 6)
 )
 
 // Reset clears out both our database and redis DB
@@ -51,9 +46,6 @@ func Reset(t *testing.T, rt *runtime.Runtime, what ResetFlag) {
 	if what&ResetStorage > 0 {
 		resetStorage(t, rt)
 	}
-	if what&ResetElastic > 0 {
-		resetElastic(t, rt)
-	}
 	if what&ResetDynamo > 0 {
 		resetDynamo(t, rt)
 	}
@@ -63,24 +55,31 @@ func Reset(t *testing.T, rt *runtime.Runtime, what ResetFlag) {
 	} else if what&ResetData > 0 {
 		resetData(t, rt)
 	}
+
+	// comes after data/db reset so reindexing happens from reset data
+	if what&ResetElastic > 0 {
+		resetElastic(t, rt)
+	}
 }
 
 // Runtime returns the various runtime things a test might need
 func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	cfg := runtime.NewDefaultConfig()
 	cfg.DeploymentID = "test"
-	cfg.Port = 8091
+	cfg.PublicPort = 8190
+	cfg.InternalPort = 8191
 	cfg.DB = "postgres://mailroom_test:temba@postgres/mailroom_test?sslmode=disable&Timezone=UTC"
-	cfg.ElasticContactsIndex = elasticContactsIndex
-	cfg.Elastic = elasticURL
+	cfg.Valkey = "valkey://valkey:6379/10" // use a different DB from the default so a locally-running courier can't pop from queues we're asserting on
+
 	cfg.AWSAccessKeyID = "root"
 	cfg.AWSSecretAccessKey = "tembatemba"
 	cfg.S3Endpoint = "http://localstack:4566"
 	cfg.S3AttachmentsBucket = "test-attachments"
-	cfg.S3SessionsBucket = "test-sessions"
 	cfg.S3PathStyle = true
 	cfg.DynamoEndpoint = "http://localstack:4566"
 	cfg.DynamoTablePrefix = "Test"
+	cfg.ElasticContactsIndex = "contacts-test"
+	cfg.ElasticMessagesIndex = "messages-test"
 	cfg.SpoolDir = absPath("./_test_spool")
 
 	err := cfg.Parse()
@@ -90,7 +89,8 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	require.NoError(t, err)
 
 	createBucket(t, rt, rt.Config.S3AttachmentsBucket)
-	createBucket(t, rt, rt.Config.S3SessionsBucket)
+	setupElasticContacts(t, rt)
+	setupElasticMessages(t, rt)
 
 	// create Postgres tables if necessary
 	_, err = rt.DB.Exec("SELECT * from orgs_org")
@@ -103,7 +103,7 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	}
 
 	// create Dynamo tables if necessary
-	dyntest.CreateTables(t, rt.Dynamo, absPath(dynamoTablesPath), false)
+	dyntest.CreateTables(t, rt.Dynamo.Main.Client(), absPath(dynamoTablesPath), false)
 
 	rt.FCM = &MockFCMClient{ValidTokens: []string{"FCMID3", "FCMID4", "FCMID5"}}
 
@@ -124,18 +124,6 @@ func Runtime(t *testing.T) (context.Context, *runtime.Runtime) {
 	})
 
 	return t.Context(), rt
-}
-
-// reindexes data changes to Elastic
-func ReindexElastic(t *testing.T, rt *runtime.Runtime) {
-	t.Helper()
-
-	contactsIndexer := indexers.NewContactIndexer(elasticURL, elasticContactsIndex, 1, 1, 100)
-	_, err := contactsIndexer.Index(&ixruntime.Runtime{DB: rt.DB.DB}, false, false)
-	require.NoError(t, err)
-
-	_, err = rt.ES.Indices.Refresh().Index(elasticContactsIndex).Do(t.Context())
-	require.NoError(t, err)
 }
 
 // resets our database to our base state from our RapidPro dump
@@ -203,9 +191,6 @@ func resetStorage(t *testing.T, rt *runtime.Runtime) {
 
 	err := rt.S3.EmptyBucket(t.Context(), rt.Config.S3AttachmentsBucket)
 	require.NoError(t, err)
-
-	err = rt.S3.EmptyBucket(t.Context(), rt.Config.S3SessionsBucket)
-	require.NoError(t, err)
 }
 
 func createBucket(t *testing.T, rt *runtime.Runtime, bucket string) {
@@ -218,35 +203,20 @@ func createBucket(t *testing.T, rt *runtime.Runtime, bucket string) {
 	}
 }
 
-// clears indexed data in Elastic
 func resetElastic(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	exists, err := rt.ES.Indices.ExistsAlias(elasticContactsIndex).Do(t.Context())
-	require.NoError(t, err)
-
-	if exists {
-		// get any indexes for the contacts alias
-		ar, err := rt.ES.Indices.GetAlias().Name(elasticContactsIndex).Do(t.Context())
-		require.NoError(t, err)
-
-		// and delete them
-		for index := range maps.Keys(ar) {
-			_, err := rt.ES.Indices.Delete(index).Do(t.Context())
-			require.NoError(t, err)
-		}
-	}
-
-	ReindexElastic(t, rt)
+	rt.ES.Writer.Flush()
+	clearElasticIndexes(t, rt)
 }
 
 func resetDynamo(t *testing.T, rt *runtime.Runtime) {
 	t.Helper()
 
-	rt.Writers.Main.Flush()
-	rt.Writers.History.Flush()
+	rt.Dynamo.Main.Flush()
+	rt.Dynamo.History.Flush()
 
-	dyntest.CreateTables(t, rt.Dynamo, absPath(dynamoTablesPath), true)
+	dyntest.CreateTables(t, rt.Dynamo.Main.Client(), absPath(dynamoTablesPath), true)
 }
 
 var sqlResetTestData = `
@@ -276,6 +246,7 @@ DELETE FROM flows_flowstart;
 DELETE FROM flows_flowsession;
 DELETE FROM flows_flowrevision WHERE flow_id >= 30000;
 DELETE FROM flows_flow WHERE id >= 30000;
+DELETE FROM ai_llmcount;
 DELETE FROM ai_llm WHERE id >= 30000;
 DELETE FROM ivr_call;
 DELETE FROM msgs_msg_labels;

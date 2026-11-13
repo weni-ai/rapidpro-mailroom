@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	valkey "github.com/gomodule/redigo/redis"
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
@@ -14,10 +14,10 @@ import (
 	"github.com/nyaruka/goflow/flows/triggers"
 	"github.com/nyaruka/goflow/test"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/msgio"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/msgio"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +31,9 @@ func TestNewCourierMsg(t *testing.T) {
 	optInID := testdb.InsertOptIn(t, rt, testdb.Org1, "45aec4dd-945f-4511-878f-7d8516fbd336", "Joke Of The Day").ID
 	testFred := testdb.InsertContact(t, rt, testdb.Org1, "fed2d179-73ac-44fd-b838-7f866fef0a3a", "Fred", "eng", models.ContactStatusActive)
 	testdb.InsertContactURN(t, rt, testdb.Org1, testFred, "tel:+593979123456", 1000, map[string]string{fmt.Sprintf("optin:%d", optInID): "sesame"})
+
+	// add a second URN to Ann so we can test other_urns
+	testdb.InsertContactURN(t, rt, testdb.Org1, testdb.Ann, "whatsapp:16055741111", 100, nil)
 
 	oa, err := models.GetOrgAssetsWithRefresh(ctx, rt, testdb.Org1.ID, models.RefreshOptIns)
 	require.NoError(t, err)
@@ -55,7 +58,7 @@ func TestNewCourierMsg(t *testing.T) {
 		&flows.MsgContent{
 			Text:         "Hi there",
 			Attachments:  []utils.Attachment{utils.Attachment("image/jpeg:https://dl-foo.com/image.jpg")},
-			QuickReplies: []flows.QuickReply{{Text: "yes", Extra: "if you really want"}, {Text: "no"}},
+			QuickReplies: []flows.QuickReply{{Type: "text", Text: "yes", Extra: "if you really want"}, {Type: "text", Text: "no"}},
 		},
 		flows.NewMsgTemplating(
 			assets.NewTemplateReference(testdb.ReviveTemplate.UUID, "revive_issue"),
@@ -82,14 +85,14 @@ func TestNewCourierMsg(t *testing.T) {
 			"image/jpeg:https://dl-foo.com/image.jpg"
 		],
 		"channel_uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91",
-		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"},
+		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf", "other_urns": ["whatsapp:16055741111"]},
 		"created_on": %s,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
 		"locale": "eng-US",
 		"org_id": 1,
 		"origin": "flow",
-		"quick_replies": [{"text": "yes", "extra": "if you really want"}, {"text": "no"}],
+		"quick_replies": [{"type": "text", "text": "yes", "extra": "if you really want"}, {"type": "text", "text": "no"}],
 		"session": {
 			"uuid": "%s",
 			"status": "W",
@@ -119,7 +122,7 @@ func TestNewCourierMsg(t *testing.T) {
 		i18n.NilLocale,
 		"",
 	), "", "")
-	in1 := testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f5", testdb.TwilioChannel, testdb.Ann, "test", models.MsgStatusHandled)
+	in1 := testdb.InsertIncomingMsg(t, rt, testdb.Org1, "0199bad8-f98d-75a3-b641-2718a25ac3f5", testdb.TwilioChannel, testdb.Ann, "test", models.MsgStatusHandled, "")
 	msg2, err := models.NewOutgoingFlowMsg(rt, oa.Org(), twilio, ann, flow, msgEvent2, &models.MsgInRef{UUID: in1.UUID, ExtID: "EX123"})
 	require.NoError(t, err)
 
@@ -132,7 +135,7 @@ func TestNewCourierMsg(t *testing.T) {
 
 	createAndAssertCourierMsg(t, oa, msg2, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf", "last_seen_on": "2023-04-20T10:15:00Z"},
+		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf", "last_seen_on": "2023-04-20T10:15:00Z", "other_urns": ["whatsapp:16055741111"]},
 		"created_on": %s,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"response_to_external_id": "EX123",
@@ -191,7 +194,7 @@ func TestNewCourierMsg(t *testing.T) {
 
 	createAndAssertCourierMsg(t, oa, msg4, fmt.Sprintf(`{
 		"channel_uuid": "74729f45-7f29-4868-9dc4-90e491e3c7d8",
-		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf", "last_seen_on": "2023-04-20T10:15:00Z"},
+		"contact": {"id": 10000, "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf", "last_seen_on": "2023-04-20T10:15:00Z", "other_urns": ["whatsapp:16055741111"]},
 		"created_on": %s,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": true,
@@ -228,7 +231,7 @@ func TestNewCourierMsg(t *testing.T) {
 			"image/jpeg:https://dl-foo.com/image.jpg"
 		],
 		"channel_uuid": "0f661e8b-ea9d-4bd3-9953-d368340acf91",
-		"contact": {"id": 10000, "last_seen_on": "2023-04-20T10:15:00Z", "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"},
+		"contact": {"id": 10000, "last_seen_on": "2023-04-20T10:15:00Z", "other_urns": ["whatsapp:16055741111"], "uuid": "a393abc0-283d-4c9b-a1b3-641a035c34bf"},
 		"created_on": %s,
 		"flow": {"uuid": "9de3663f-c5c5-4c92-9f45-ecbc09abcc85", "name": "Favorites"},
 		"high_priority": false,
@@ -236,7 +239,7 @@ func TestNewCourierMsg(t *testing.T) {
 		"org_id": 1,
 		"origin": "flow",
 		"prev_attempts": 1,
-		"quick_replies": [{"text": "yes", "extra": "if you really want"}, {"text": "no"}],
+		"quick_replies": [{"type": "text", "text": "yes", "extra": "if you really want"}, {"type": "text", "text": "no"}],
 		"templating": {
 			"template": {"uuid": "9c22b594-fcab-4b29-9bcb-ce4404894a80", "name": "revive_issue"},
 			"components": [{"type": "body", "name": "body", "variables": {"1": 0}}],
@@ -388,12 +391,12 @@ func TestPushCourierBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that channel has been added to active list
-	msgsActive, err := redis.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
+	msgsActive, err := valkey.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10"}, msgsActive)
 
 	// and that msgs were added as single batch to bulk priority (0) queue
-	queued, err := redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err := valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(queued))
 
@@ -414,7 +417,7 @@ func TestPushCourierBatch(t *testing.T) {
 	err = msgio.PushCourierBatch(vc, oa, channel, []*models.MsgOut{{Msg: msg3, URN: annURNs[0], Contact: ann}}, "1636557205.234567")
 	require.NoError(t, err)
 
-	queued, err = redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err = valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(queued))
 
@@ -428,12 +431,12 @@ func TestPushCourierBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that channel has *not* been added to active list
-	msgsActive, err = redis.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
+	msgsActive, err = valkey.Strings(vc.Do("ZRANGE", "msgs:active", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{}, msgsActive)
 
 	// but msg was still added to queue
-	queued, err = redis.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
+	queued, err = valkey.ByteSlices(vc.Do("ZRANGE", "msgs:74729f45-7f29-4868-9dc4-90e491e3c7d8|10/0", 0, -1))
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(queued))
 }

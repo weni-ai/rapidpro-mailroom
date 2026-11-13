@@ -6,9 +6,9 @@ import (
 
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/testsuite"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/testsuite"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
 	"github.com/nyaruka/vkutil/assertvk"
 )
 
@@ -51,9 +51,6 @@ func TestMsgCreatedNewURN(t *testing.T) {
 
 	// switch our twitter channel to telegram
 	rt.DB.MustExec(`UPDATE channels_channel SET channel_type = 'TG', name = 'Telegram', schemes = ARRAY['telegram'] WHERE uuid = $1`, testdb.FacebookChannel.UUID)
-
-	// give Cat a URN that Bob will steal
-	testdb.InsertContactURN(t, rt, testdb.Org1, testdb.Cat, urns.URN("telegram:67890"), 1, nil)
 
 	runTests(t, rt, "testdata/msg_created_with_new_urn.json")
 }

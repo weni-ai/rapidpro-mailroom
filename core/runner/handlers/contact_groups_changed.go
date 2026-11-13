@@ -6,10 +6,10 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/core/runner/hooks"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/core/runner/hooks"
+	"github.com/nyaruka/mailroom/v26/runtime"
 )
 
 func init() {
@@ -40,6 +40,7 @@ func handleContactGroupsChanged(ctx context.Context, rt *runtime.Runtime, oa *mo
 		scene.AttachPreCommitHook(hooks.UpdateContactGroups, hookEvent)
 		scene.AttachPreCommitHook(hooks.UpdateCampaignFires, hookEvent)
 		scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+		scene.AttachPostCommitHook(hooks.IndexContacts, event)
 	}
 
 	// add each of our groups
@@ -60,6 +61,7 @@ func handleContactGroupsChanged(ctx context.Context, rt *runtime.Runtime, oa *mo
 		scene.AttachPreCommitHook(hooks.UpdateContactGroups, hookEvent)
 		scene.AttachPreCommitHook(hooks.UpdateCampaignFires, hookEvent)
 		scene.AttachPreCommitHook(hooks.UpdateContactModifiedOn, event)
+		scene.AttachPostCommitHook(hooks.IndexContacts, event)
 	}
 
 	return nil

@@ -8,11 +8,11 @@ import (
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/resumes"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	_ "github.com/nyaruka/mailroom/core/runner/handlers"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/testsuite/testdb"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	_ "github.com/nyaruka/mailroom/v26/core/runner/handlers"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/testsuite/testdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +50,7 @@ func ResumeSession(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets, cont
 
 	require.NotEqual(t, flows.SessionUUID(""), mc.CurrentSessionUUID(), "contact must have a waiting session")
 
-	modelSession, err := models.GetWaitingSessionForContact(ctx, rt, oa, fc, mc.CurrentSessionUUID())
+	modelSession, err := models.GetContactWaitingSession(ctx, rt, oa, mc)
 	require.NoError(t, err)
 
 	scene := runner.NewScene(mc, fc)
@@ -61,7 +61,7 @@ func ResumeSession(t *testing.T, rt *runtime.Runtime, oa *models.OrgAssets, cont
 		r = typed
 	case string:
 		msg := flows.NewMsgIn(contact.URN, nil, typed, nil, "")
-		r = resumes.NewMsg(events.NewMsgReceived(msg))
+		r = resumes.NewMsg(events.NewMsgReceived(msg, ""))
 	default:
 		panic("invalid resume type")
 	}

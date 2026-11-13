@@ -6,9 +6,9 @@ import (
 
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
@@ -35,10 +35,9 @@ func (h *updateMessageHandled) Execute(ctx context.Context, rt *runtime.Runtime,
 			visibility = models.VisibilityArchived
 		}
 
-		// associate this message with the last open ticket for this contact
 		var ticket *models.Ticket
-		if tks := scene.DBContact.Tickets(); len(tks) > 0 {
-			ticket = tks[len(tks)-1]
+		if evt.TicketUUID != "" {
+			ticket = scene.DBContact.FindTicket(evt.TicketUUID)
 		}
 
 		err := models.MarkMessageHandled(ctx, tx, msgIn.UUID, models.MsgStatusHandled, visibility, flow, ticket, msgIn.Attachments, msgIn.LogUUIDs)

@@ -11,10 +11,10 @@ import (
 	"github.com/lib/pq"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/events"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -40,7 +40,7 @@ func handleDelete(ctx context.Context, rt *runtime.Runtime, r *deleteRequest) (a
 	}
 
 	// get the messages that will be deleted
-	rows, err := rt.DB.QueryContext(ctx, `SELECT uuid, contact_id FROM msgs_msg WHERE org_id = $1 AND uuid = ANY($2) AND direction = 'I' AND visibility IN ('V', 'A')`, r.OrgID, pq.Array(r.MsgUUIDs))
+	rows, err := rt.DB.QueryContext(ctx, `SELECT uuid, contact_id FROM msgs_msg WHERE org_id = $1 AND uuid = ANY($2) AND direction = 'I' AND visibility IN ('V', 'A') ORDER BY id`, r.OrgID, pq.Array(r.MsgUUIDs))
 	if err != nil {
 		return nil, 0, fmt.Errorf("error loading messages: %w", err)
 	}
@@ -75,7 +75,7 @@ func handleDelete(ctx context.Context, rt *runtime.Runtime, r *deleteRequest) (a
 		for _, tUUID := range msgsByContact[mc.ID()] {
 			evt := events.NewMsgDeleted(tUUID, false)
 
-			if err := scene.AddEvent(ctx, rt, oa, evt, r.UserID); err != nil {
+			if err := scene.AddEvent(ctx, rt, oa, evt, r.UserID, ""); err != nil {
 				return nil, 0, fmt.Errorf("error adding msg delete event to scene for contact %s: %w", scene.ContactUUID(), err)
 			}
 		}
