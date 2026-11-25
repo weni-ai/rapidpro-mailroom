@@ -8,9 +8,9 @@ import (
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
 	"github.com/nyaruka/goflow/flows/modifiers"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -46,7 +46,7 @@ func handleChangeTopic(ctx context.Context, rt *runtime.Runtime, r *changeTopicR
 		return modifiers.NewTicketTopic(t.UUID, topic)
 	}
 
-	eventsByContact, err := modifyTickets(ctx, rt, oa, r.UserID, r.TicketUUIDs, mod)
+	eventsByContact, err := modifyTickets(ctx, rt, oa, r.UserID, r.TicketUUIDs, mod, r.Via)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error changing ticket topic: %w", err)
 	}

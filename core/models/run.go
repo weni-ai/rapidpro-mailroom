@@ -10,7 +10,7 @@ import (
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/assets"
 	"github.com/nyaruka/goflow/flows"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/nyaruka/null/v3"
 	"github.com/vinovest/sqlx"
 )
@@ -161,6 +161,38 @@ func GetContactIDsAtNode(ctx context.Context, rt *runtime.Runtime, orgID OrgID, 
 	}
 
 	return contactIDs, nil
+}
+
+const sqlSelectContactFlowHistory = `
+SELECT contact_id, ARRAY_AGG(DISTINCT flow_id ORDER BY flow_id) FROM flows_flowrun WHERE contact_id = ANY($1) GROUP BY contact_id`
+
+// GetContactFlowHistory returns the distinct flow IDs that each contact has run, keyed by contact ID.
+func GetContactFlowHistory(ctx context.Context, db *sqlx.DB, contactIDs []ContactID) (map[ContactID][]FlowID, error) {
+	result := make(map[ContactID][]FlowID, len(contactIDs))
+	if len(contactIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := db.QueryContext(ctx, sqlSelectContactFlowHistory, pq.Array(contactIDs))
+	if err != nil {
+		return nil, fmt.Errorf("error querying flow history: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var contactID ContactID
+		var flowIDs pq.Int64Array
+		if err := rows.Scan(&contactID, &flowIDs); err != nil {
+			return nil, fmt.Errorf("error scanning flow history: %w", err)
+		}
+		ids := make([]FlowID, len(flowIDs))
+		for i, id := range flowIDs {
+			ids[i] = FlowID(id)
+		}
+		result[contactID] = ids
+	}
+
+	return result, rows.Err()
 }
 
 type RunReference struct {

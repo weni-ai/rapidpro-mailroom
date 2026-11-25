@@ -21,8 +21,8 @@ import (
 	"github.com/nyaruka/gocommon/httpx"
 	"github.com/nyaruka/gocommon/jsonx"
 	"github.com/nyaruka/goflow/test"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +40,6 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 
 	type TestCase struct {
 		Label           string                `json:"label"`
-		HTTPMocks       *httpx.MockRequestor  `json:"http_mocks,omitempty"`
 		Method          string                `json:"method"`
 		Path            string                `json:"path"`
 		Headers         map[string]string     `json:"headers,omitempty"`
@@ -52,6 +51,7 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		DBAssertions    []*assertdb.Assert    `json:"db_assertions,omitempty"`
 		ExpectedTasks   map[string][]TaskInfo `json:"expected_tasks,omitempty"`
 		ExpectedHistory []*dynamo.Item        `json:"expected_history,omitempty"`
+		IndexedMessages []IndexedMessage      `json:"indexed_messages,omitempty"`
 
 		actualResponse  []byte
 		expectsJSONBody bool
@@ -64,17 +64,19 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 
 	test.MockUniverse()
 
-	for i, tc := range tcs {
-		var clonedMocks *httpx.MockRequestor
-		if tc.HTTPMocks != nil {
-			tc.HTTPMocks.SetIgnoreLocal(true)
-			httpx.SetRequestor(tc.HTTPMocks)
-			clonedMocks = tc.HTTPMocks.Clone()
-		} else {
-			httpx.SetRequestor(httpx.DefaultRequestor)
-		}
+	// track which messages were already indexed before each test case so we only report new ones
+	prevIndexedIDs := make(map[string]bool)
+	for _, m := range GetIndexedMessages(t, rt, false) {
+		prevIndexedIDs[m.ID] = true
+	}
 
-		testURL := "http://localhost:8091" + tc.Path
+	for i, tc := range tcs {
+		// route /mi/* requests to the internal listener and everything else to the public listener
+		host := "http://localhost:8190"
+		if strings.HasPrefix(tc.Path, "/mi/") {
+			host = "http://localhost:8191"
+		}
+		testURL := host + tc.Path
 		var req *http.Request
 		if tc.BodyEncode == "multipart" {
 			var parts []MultiPartPart
@@ -100,18 +102,20 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err, "%s: error making request", tc.Label)
 
-		// check all http mocks were used
-		if tc.HTTPMocks != nil {
-			assert.False(t, tc.HTTPMocks.HasUnused(), "%s: unused HTTP mocks in %s", tc.Label)
-		}
-
 		// clone test case and populate with actual values
 		actual := tc
 		actual.Status = resp.StatusCode
-		actual.HTTPMocks = clonedMocks
 		actual.actualResponse, err = io.ReadAll(resp.Body)
 		actual.ExpectedTasks = GetQueuedTasks(t, rt)
-		actual.ExpectedHistory = GetHistoryItems(t, rt, true)
+		actual.ExpectedHistory = GetHistoryItems(t, rt, true, test.MockStartTime)
+		allIndexed := GetIndexedMessages(t, rt, false)
+		actual.IndexedMessages = make([]IndexedMessage, 0, len(allIndexed))
+		for _, m := range allIndexed {
+			if !prevIndexedIDs[m.ID] {
+				actual.IndexedMessages = append(actual.IndexedMessages, m)
+				prevIndexedIDs[m.ID] = true
+			}
+		}
 
 		actual.DBAssertions = make([]*assertdb.Assert, len(tc.DBAssertions))
 		for i, dba := range tc.DBAssertions {
@@ -172,6 +176,14 @@ func RunWebTests(t *testing.T, rt *runtime.Runtime, truthFile string) {
 				tc.ExpectedHistory = []*dynamo.Item{}
 			}
 			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.ExpectedHistory), jsonx.MustMarshal(actual.ExpectedHistory), "%s: event history mismatch", tc.Label)
+
+			if tc.IndexedMessages == nil {
+				tc.IndexedMessages = []IndexedMessage{}
+			}
+			if actual.IndexedMessages == nil {
+				actual.IndexedMessages = []IndexedMessage{}
+			}
+			test.AssertEqualJSON(t, jsonx.MustMarshal(tc.IndexedMessages), jsonx.MustMarshal(actual.IndexedMessages), "%s: indexed messages mismatch", tc.Label)
 
 		} else {
 			tcs[i] = actual

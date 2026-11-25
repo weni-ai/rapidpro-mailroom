@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
@@ -18,7 +18,6 @@ type updateContactModifiedOn struct{}
 func (h *updateContactModifiedOn) Order() int { return 100 } // run after all other hooks
 
 func (h *updateContactModifiedOn) Execute(ctx context.Context, rt *runtime.Runtime, tx *sqlx.Tx, oa *models.OrgAssets, scenes map[*runner.Scene][]any) error {
-	// our lists of contact ids
 	contactIDs := make([]models.ContactID, 0, len(scenes))
 
 	for scene := range scenes {

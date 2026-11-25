@@ -9,9 +9,9 @@ import (
 
 	"github.com/nyaruka/gocommon/i18n"
 	"github.com/nyaruka/gocommon/urns"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/runtime"
-	"github.com/nyaruka/mailroom/web"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/web"
 )
 
 func init() {
@@ -50,12 +50,12 @@ func handleURNs(ctx context.Context, rt *runtime.Runtime, r *urnsRequest) (any, 
 	results := make([]urnResult, len(r.URNs))
 
 	for i, urn := range r.URNs {
-		norm := urn.Normalize()
+		norm := models.NormalizeURN(urn)
 		scheme, path, _, _ := norm.ToParts()
 
 		results[i].Normalized = norm
 
-		if err := norm.Validate(); err != nil {
+		if err := models.ValidateURN(norm); err != nil {
 			results[i].Error = err.Error()
 		} else {
 			urnsToLookup[norm] = i

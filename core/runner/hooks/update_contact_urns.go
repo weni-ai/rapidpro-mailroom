@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
 	"github.com/vinovest/sqlx"
 )
 
@@ -25,7 +25,7 @@ func (h *updateContactURNs) Execute(ctx context.Context, rt *runtime.Runtime, tx
 		changes = append(changes, urnChange)
 	}
 
-	if err := models.UpdateContactURNs(ctx, tx, oa, changes); err != nil {
+	if err := models.UpdateContactURNs(ctx, rt, tx, oa, changes); err != nil {
 		return fmt.Errorf("error updating contact urns: %w", err)
 	}
 

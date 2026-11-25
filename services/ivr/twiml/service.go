@@ -24,10 +24,11 @@ import (
 	"github.com/nyaruka/goflow/flows/events"
 	"github.com/nyaruka/goflow/flows/routers/waits/hints"
 	"github.com/nyaruka/goflow/utils"
-	"github.com/nyaruka/mailroom/core/ivr"
-	"github.com/nyaruka/mailroom/core/models"
-	"github.com/nyaruka/mailroom/core/runner"
-	"github.com/nyaruka/mailroom/runtime"
+	"github.com/nyaruka/mailroom/v26/core/ivr"
+	"github.com/nyaruka/mailroom/v26/core/models"
+	"github.com/nyaruka/mailroom/v26/core/runner"
+	"github.com/nyaruka/mailroom/v26/runtime"
+	"github.com/nyaruka/mailroom/v26/utils/svclogs"
 )
 
 // IgnoreSignatures controls whether we ignore signatures (public for testing overriding)
@@ -451,7 +452,7 @@ func (s *service) postRequest(sendURL string, form url.Values) (*httpx.Trace, er
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	return httpx.DoTrace(s.httpClient, req, nil, nil, -1)
+	return svclogs.TraceRequest(s.httpClient.Transport, s.httpClient.Timeout, req)
 }
 
 // see https://www.twilio.com/docs/api/security
