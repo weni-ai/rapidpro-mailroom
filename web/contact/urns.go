@@ -50,12 +50,12 @@ func handleURNs(ctx context.Context, rt *runtime.Runtime, r *urnsRequest) (any, 
 	results := make([]urnResult, len(r.URNs))
 
 	for i, urn := range r.URNs {
-		norm := urn.Normalize()
+		norm := models.NormalizeURN(urn)
 		scheme, path, _, _ := norm.ToParts()
 
 		results[i].Normalized = norm
 
-		if err := norm.Validate(); err != nil {
+		if err := models.ValidateURN(norm); err != nil {
 			results[i].Error = err.Error()
 		} else {
 			urnsToLookup[norm] = i

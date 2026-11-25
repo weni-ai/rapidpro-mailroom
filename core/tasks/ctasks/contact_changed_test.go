@@ -126,3 +126,33 @@ func TestReassignShellOnContactChanged(t *testing.T) {
 	assertdb.Query(t, rt.DB, `SELECT contact_id FROM contacts_contacturn WHERE identity = $1`, "bsuid:US.A1B2C3").Returns(int64(testdb.Ann.ID))
 	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1`, shell.ID).Returns(0)
 }
+
+func TestReassignShellOnContactChangedWhatsAppScheme(t *testing.T) {
+	ctx, rt := testsuite.Runtime(t)
+	vc := rt.VK.Get()
+	defer vc.Close()
+
+	defer testsuite.Reset(t, rt, testsuite.ResetData|testsuite.ResetDynamo|testsuite.ResetElastic)
+
+	shell := testdb.InsertContact(t, rt, testdb.Org1, "c4e5f6a7-b8c9-4d0e-91f2-3456789abc01", "ShellWA", "eng", models.ContactStatusActive)
+	testdb.InsertContactURN(t, rt, testdb.Org1, shell, "whatsapp:US.A1B2C3", 1000, nil)
+
+	task := &ctasks.ContactChanged{
+		ChannelID: testdb.TwilioChannel.ID,
+		NewURN: &ctasks.NewURNSpec{
+			Value:  "whatsapp:US.A1B2C3",
+			Action: "append",
+		},
+	}
+
+	err := tasks.QueueContact(ctx, rt, testdb.Org1.ID, testdb.Ann.ID, task)
+	require.NoError(t, err)
+
+	queued, err := rt.Queues.Realtime.Pop(ctx, vc)
+	require.NoError(t, err)
+	require.NotNil(t, queued)
+	require.NoError(t, tasks.Perform(ctx, rt, queued))
+
+	assertdb.Query(t, rt.DB, `SELECT contact_id FROM contacts_contacturn WHERE identity = $1`, "whatsapp:US.A1B2C3").Returns(int64(testdb.Ann.ID))
+	assertdb.Query(t, rt.DB, `SELECT count(*) FROM contacts_contacturn WHERE contact_id = $1`, shell.ID).Returns(0)
+}

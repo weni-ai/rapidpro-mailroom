@@ -87,7 +87,7 @@ type NewURNSpec struct {
 // Apply appends the new URN to the contact, recording channel affinity for the given channel if set. A BSUID owned by
 // a shell contact (no other URNs) is reassigned to this contact first so the append can proceed.
 func (s *NewURNSpec) Apply(ctx context.Context, rt *runtime.Runtime, oa *models.OrgAssets, scene *runner.Scene, channel *models.Channel) error {
-	if s.Value.Scheme() == urns.BSUID.Prefix {
+	if models.IsWhatsAppBSUID(s.Value) {
 		ownerID, reassigned, err := models.ReassignShellContactURN(ctx, rt.DB, oa, scene.ContactID(), s.Value)
 		if err != nil {
 			return fmt.Errorf("error reassigning URN from shell contact: %w", err)
