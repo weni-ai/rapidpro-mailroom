@@ -95,6 +95,6 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         if: contains(github.ref, '-')
         with:
-          args: release --clean --skip-validate
+          args: release --clean --skip=validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
