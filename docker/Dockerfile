@@ -12,11 +12,15 @@ RUN curl -L https://github.com/nyaruka/goflow/releases/download/v$(grep goflow g
 
 RUN GOOS=linux GOARCH=amd64 go build -o /bin/mailroom github.com/nyaruka/mailroom/v26/cmd/mailroom
 
-FROM gcr.io/distroless/base-debian12
+FROM debian:bookworm-slim
+
+# ca-certificates for outbound TLS; distroless had no shell, debian-slim provides /bin/sh
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder bin/mailroom ./
+COPY --from=builder /bin/mailroom ./
 COPY --from=builder /src/docs ./docs
 
 EXPOSE 8090
