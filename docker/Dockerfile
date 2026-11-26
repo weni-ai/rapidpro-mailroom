@@ -11,6 +11,7 @@ RUN curl -L https://github.com/nyaruka/goflow/releases/download/v$(grep goflow g
     tar -xf docs.tar.gz && rm docs.tar.gz
 
 RUN GOOS=linux GOARCH=amd64 go build -o /bin/mailroom github.com/nyaruka/mailroom/v26/cmd/mailroom
+RUN GOOS=linux GOARCH=amd64 go build -o /bin/mrindex github.com/nyaruka/mailroom/v26/cmd/mrindex
 
 FROM debian:bookworm-slim
 
@@ -21,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 
 COPY --from=builder /bin/mailroom ./
+COPY --from=builder /bin/mrindex ./
 COPY --from=builder /src/docs ./docs
 
 EXPOSE 8090
